@@ -23,12 +23,16 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LogicalCluster is the name of the logical cluster. A logical cluster is
+// LogicalCluster is the name of a logical cluster. A logical cluster is
 // 1. a (part of) etcd prefix to store objects in that cluster
-// 2. a (part of) an http path which serves a Kubernetes-cluster-like API with
+// 2. a (part of) a http path which serves a Kubernetes-cluster-like API with
 //    discovery, OpenAPI and the actual API groups.
 // 3. a value in metadata.clusterName in objects from cross-workspace list/watches,
 //    which is used to identify the logical cluster.
+//
+// A logical cluster is of type string, and is either "root" or a logical cluster
+// (called parent) followed by the separator ":" and a word. In other words, it is
+// like a path, but with colons instead of slashes.
 type LogicalCluster string
 
 const seperator = ":"
@@ -81,5 +85,5 @@ func (cn LogicalCluster) Join(name string) LogicalCluster {
 
 // IsValid returns true if the logical cluster name is valid.
 func (cn LogicalCluster) IsValid() bool {
-	return cn == Root || strings.Contains(string(cn), seperator)
+	return cn == Root || (strings.Contains(string(cn), seperator) && strings.HasPrefix(string(cn), Root.String()+seperator))
 }
