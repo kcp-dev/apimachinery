@@ -18,19 +18,30 @@ package logicalcluster
 
 import (
 	"path"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// LogicalClusterName is the name of the logical cluster. A logical cluster is
+// 1. a (part of) etcd prefix to store objects in that cluster
+// 2. a (part of) an http path which serves a Kubernetes-cluster-like API with
+//    discovery, OpenAPI and the actual API groups.
+// 3. a value in metadata.clusterName in objects from cross-workspace list/watches,
+//    which is used to identify the logical cluster.
 type LogicalClusterName string
 
+// LogicalClusterPath returns a path segment for the logical cluster to access its API.
 func (cn LogicalClusterName) LogicalClusterPath() string {
 	return path.Join("/clusters", string(cn))
 }
 
+// String returns the string representation of the logical cluster name.
 func (cn LogicalClusterName) String() string {
 	return string(cn)
 }
 
-func GetLogicalClusterName(obj v1.Object) LogicalClusterName {
+// From returns a logical cluster name from an Object's
+// metadata.clusterName.
+func From(obj v1.Object) LogicalClusterName {
 	return LogicalClusterName(obj.GetClusterName())
 }
