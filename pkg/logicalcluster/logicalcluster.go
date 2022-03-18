@@ -30,13 +30,11 @@ import (
 // 3. a value in metadata.clusterName in objects from cross-workspace list/watches,
 //    which is used to identify the logical cluster.
 //
-// A logical cluster is of type string, and is either "root" or a logical cluster
-// (called parent) followed by the separator ":" and a word. In other words, it is
+// A logical cluster is a colon separated list of words. In other words, it is
 // like a path, but with colons instead of slashes.
 type LogicalCluster string
 
 const seperator = ":"
-const Root = LogicalCluster("root")
 
 // Path returns a path segment for the logical cluster to access its API.
 func (cn LogicalCluster) Path() string {
@@ -56,11 +54,8 @@ func From(obj v1.Object) LogicalCluster {
 
 // Parent returns the parent logical cluster name of the given logical cluster name.
 func (cn LogicalCluster) Parent() (LogicalCluster, bool) {
-	if cn == Root {
-		return Root, false
-	}
 	parent, _ := cn.Split()
-	return parent, true
+	return parent, parent != ""
 }
 
 // Split splits logical cluster immediately following the final colon,
@@ -79,17 +74,7 @@ func (cn LogicalCluster) Base() string {
 	return name
 }
 
-// IsRoot returns true if the logical cluster name is the root logical cluster.
-func (cn LogicalCluster) IsRoot() bool {
-	return cn == Root
-}
-
 // Join joins a parent logical cluster name and a name component.
 func (cn LogicalCluster) Join(name string) LogicalCluster {
 	return LogicalCluster(string(cn) + seperator + name)
-}
-
-// IsValid returns true if the logical cluster name is valid.
-func (cn LogicalCluster) IsValid() bool {
-	return cn == Root || (strings.Contains(string(cn), seperator) && strings.HasPrefix(string(cn), Root.String()+seperator))
 }
