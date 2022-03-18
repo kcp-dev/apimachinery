@@ -73,6 +73,12 @@ func (cn LogicalCluster) Split() (parent LogicalCluster, name string) {
 	return cn[:i+1], string(cn)[i+1:]
 }
 
+// Base returns the last component of the logical cluster name.
+func (cn LogicalCluster) Base() string {
+	_, name := cn.Split()
+	return name
+}
+
 // IsRoot returns true if the logical cluster name is the root logical cluster.
 func (cn LogicalCluster) IsRoot() bool {
 	return cn == Root
