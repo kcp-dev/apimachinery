@@ -65,6 +65,9 @@ func (cn LogicalCluster) Parent() (LogicalCluster, bool) {
 // The returned values have the property that lcn = dir+file.
 func (cn LogicalCluster) Split() (parent LogicalCluster, name string) {
 	i := strings.LastIndex(string(cn), seperator)
+	if i < 0 {
+		return LogicalCluster(""), string(cn)
+	}
 	return cn[:i], string(cn)[i+1:]
 }
 
