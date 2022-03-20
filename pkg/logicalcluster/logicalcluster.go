@@ -79,5 +79,8 @@ func (cn LogicalCluster) Base() string {
 
 // Join joins a parent logical cluster name and a name component.
 func (cn LogicalCluster) Join(name string) LogicalCluster {
+	if cn == "" {
+		return LogicalCluster(name)
+	}
 	return LogicalCluster(string(cn) + seperator + name)
 }
