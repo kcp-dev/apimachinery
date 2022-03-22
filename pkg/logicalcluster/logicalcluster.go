@@ -39,13 +39,18 @@ type LogicalCluster struct {
 const seperator = ":"
 
 var (
+	// Wildcard is the logical cluster indicating cross-workspace requests.
 	Wildcard = New("*")
-	Empty    = New("")
 )
 
 // New returns a logical cluster from a string.
 func New(value string) LogicalCluster {
 	return LogicalCluster{value}
+}
+
+// Empty returns true if the logical cluster is unset.
+func (l LogicalCluster) Empty() bool {
+	return l.value == ""
 }
 
 // Path returns a path segment for the logical cluster to access its API.
