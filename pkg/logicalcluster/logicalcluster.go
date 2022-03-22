@@ -38,6 +38,11 @@ type LogicalCluster struct {
 
 const seperator = ":"
 
+var (
+	Wildcard = New("*")
+	Empty    = New("")
+)
+
 // New returns a logical cluster from a string.
 func New(value string) LogicalCluster {
 	return LogicalCluster{value}
