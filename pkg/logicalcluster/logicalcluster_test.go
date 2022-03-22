@@ -26,11 +26,11 @@ func TestLogicalCluster_Split(t *testing.T) {
 		parent LogicalCluster
 		name   string
 	}{
-		{"", "", ""},
-		{"foo", "", "foo"},
-		{"foo:bar", "foo", "bar"},
-		{"foo:bar:baz", "foo:bar", "baz"},
-		{"foo::baz", "foo:", "baz"},
+		{New(""), New(""), ""},
+		{New("foo"), New(""), "foo"},
+		{New("foo:bar"), New("foo"), "bar"},
+		{New("foo:bar:baz"), New("foo:bar"), "baz"},
+		{New("foo::baz"), New("foo:"), "baz"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

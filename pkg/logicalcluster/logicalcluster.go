@@ -32,30 +32,37 @@ import (
 //
 // A logical cluster is a colon separated list of words. In other words, it is
 // like a path, but with colons instead of slashes.
-type LogicalCluster string
+type LogicalCluster struct {
+	value string
+}
 
 const seperator = ":"
 
+// New returns a logical cluster from a string.
+func New(value string) LogicalCluster {
+	return LogicalCluster{value}
+}
+
 // Path returns a path segment for the logical cluster to access its API.
 func (cn LogicalCluster) Path() string {
-	return path.Join("/clusters", string(cn))
+	return path.Join("/clusters", cn.value)
 }
 
 // String returns the string representation of the logical cluster name.
 func (cn LogicalCluster) String() string {
-	return string(cn)
+	return cn.value
 }
 
 // From returns a logical cluster name from an Object's
 // metadata.clusterName.
 func From(obj v1.Object) LogicalCluster {
-	return LogicalCluster(obj.GetClusterName())
+	return LogicalCluster{obj.GetClusterName()}
 }
 
 // Parent returns the parent logical cluster name of the given logical cluster name.
 func (cn LogicalCluster) Parent() (LogicalCluster, bool) {
 	parent, _ := cn.Split()
-	return parent, parent != ""
+	return parent, parent.value != ""
 }
 
 // Split splits logical cluster immediately following the final colon,
@@ -64,11 +71,11 @@ func (cn LogicalCluster) Parent() (LogicalCluster, bool) {
 // and name set to path.
 // The returned values have the property that lcn = dir+file.
 func (cn LogicalCluster) Split() (parent LogicalCluster, name string) {
-	i := strings.LastIndex(string(cn), seperator)
+	i := strings.LastIndex(cn.value, seperator)
 	if i < 0 {
-		return LogicalCluster(""), string(cn)
+		return LogicalCluster{}, cn.value
 	}
-	return cn[:i], string(cn)[i+1:]
+	return LogicalCluster{cn.value[:i]}, cn.value[i+1:]
 }
 
 // Base returns the last component of the logical cluster name.
@@ -79,8 +86,8 @@ func (cn LogicalCluster) Base() string {
 
 // Join joins a parent logical cluster name and a name component.
 func (cn LogicalCluster) Join(name string) LogicalCluster {
-	if cn == "" {
-		return LogicalCluster(name)
+	if cn.value == "" {
+		return LogicalCluster{name}
 	}
-	return LogicalCluster(string(cn) + seperator + name)
+	return LogicalCluster{cn.value + seperator + name}
 }
