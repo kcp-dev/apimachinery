@@ -17,6 +17,7 @@ limitations under the License.
 package logicalcluster
 
 import (
+	"encoding/json"
 	"path"
 	"strings"
 
@@ -100,4 +101,17 @@ func (cn LogicalCluster) Join(name string) LogicalCluster {
 		return LogicalCluster{name}
 	}
 	return LogicalCluster{cn.value + seperator + name}
+}
+
+func (cn LogicalCluster) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&cn.value)
+}
+
+func (cn LogicalCluster) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	cn.value = s
+	return nil
 }
