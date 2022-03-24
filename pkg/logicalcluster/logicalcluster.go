@@ -107,7 +107,7 @@ func (cn LogicalCluster) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&cn.value)
 }
 
-func (cn LogicalCluster) UnmarshalJSON(data []byte) error {
+func (cn *LogicalCluster) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
