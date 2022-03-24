@@ -17,7 +17,10 @@ limitations under the License.
 package logicalcluster
 
 import (
+	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogicalCluster_Split(t *testing.T) {
@@ -43,4 +46,25 @@ func TestLogicalCluster_Split(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJSON(t *testing.T) {
+	type JWT struct {
+		I  int            `json:"i"`
+		CN LogicalCluster `json:"cn"`
+	}
+
+	jwt := JWT{
+		I:  1,
+		CN: New("foo:bar"),
+	}
+
+	bs, err := json.Marshal(jwt)
+	require.NoError(t, err)
+	require.Equal(t, `{"i":1,"cn":"foo:bar"}`, string(bs))
+
+	var jwt2 JWT
+	err = json.Unmarshal(bs, &jwt2)
+	require.NoError(t, err)
+	require.Equal(t, jwt, jwt2)
 }
