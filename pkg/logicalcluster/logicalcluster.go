@@ -115,3 +115,7 @@ func (cn *LogicalCluster) UnmarshalJSON(data []byte) error {
 	cn.value = s
 	return nil
 }
+
+func (cn LogicalCluster) HasPrefix(other LogicalCluster) bool {
+	return strings.HasPrefix(cn.value, other.value)
+}
