@@ -56,7 +56,7 @@ func (l LogicalCluster) Empty() bool {
 
 // Path returns a path segment for the logical cluster to access its API.
 func (cn LogicalCluster) Path() string {
-	return path.Join("/clusters", cn.value)
+	return path.Join("/clusters", strings.TrimPrefix(cn.value, "root:"))
 }
 
 // String returns the string representation of the logical cluster name.
