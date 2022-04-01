@@ -20,8 +20,6 @@ import (
 	"encoding/json"
 	"path"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // LogicalCluster is the name of a logical cluster. A logical cluster is
@@ -64,9 +62,15 @@ func (cn LogicalCluster) String() string {
 	return cn.value
 }
 
+// Object is a local interface representation of the Kubernetes metav1.Object, to avoid dependencies on
+// k8s.io/apimachinery.
+type Object interface {
+	GetClusterName() string
+}
+
 // From returns a logical cluster name from an Object's
 // metadata.clusterName.
-func From(obj v1.Object) LogicalCluster {
+func From(obj Object) LogicalCluster {
 	return LogicalCluster{obj.GetClusterName()}
 }
 
