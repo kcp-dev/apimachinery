@@ -18,6 +18,7 @@ package logicalcluster
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,4 +68,45 @@ func TestJSON(t *testing.T) {
 	err = json.Unmarshal(bs, &jwt2)
 	require.NoError(t, err)
 	require.Equal(t, jwt, jwt2)
+}
+
+func TestNew(t *testing.T) {
+	tests := []struct {
+		value string
+		want  LogicalCluster
+	}{
+		{"", LogicalCluster{}},
+		{"root", LogicalCluster{value: "root"}},
+		{"root:foo:bar", LogicalCluster{value: "root:foo:bar"}},
+		{"system:admin", LogicalCluster{value: "system:admin"}},
+
+		{":foo:bar", LogicalCluster{value: "root:foo:bar"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			if got := New(tt.value); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("New() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPrettyString(t *testing.T) {
+	tests := []struct {
+		cluster string
+		want    string
+	}{
+		{"", ""},
+		{"root", "root"},
+		{"root:foo:bar", ":foo:bar"},
+		{"system:admin", "system:admin"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.cluster, func(t *testing.T) {
+			lc := LogicalCluster{value: tt.cluster}
+			if got := lc.PrettyString(); got != tt.want {
+				t.Errorf("PrettyString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

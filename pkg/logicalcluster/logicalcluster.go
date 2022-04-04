@@ -44,6 +44,9 @@ var (
 
 // New returns a logical cluster from a string.
 func New(value string) LogicalCluster {
+	if strings.HasPrefix(value, seperator) {
+		return LogicalCluster{"root" + value}
+	}
 	return LogicalCluster{value}
 }
 
@@ -59,6 +62,15 @@ func (cn LogicalCluster) Path() string {
 
 // String returns the string representation of the logical cluster name.
 func (cn LogicalCluster) String() string {
+	return cn.value
+}
+
+// PrettyString returns the string representation of the logical cluster name,
+// with a possible "root" prefix removed.
+func (cn LogicalCluster) PrettyString() string {
+	if strings.HasPrefix(cn.value, "root"+seperator) {
+		return strings.TrimPrefix(cn.value, "root")
+	}
 	return cn.value
 }
 
