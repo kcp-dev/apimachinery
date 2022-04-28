@@ -8,31 +8,33 @@ import (
 )
 
 const (
-	ClusterIndexName             = "cluster"
+	// ClusterIndexName is the name of the index that allows you to filter by cluster
+	ClusterIndexName = "cluster"
+	// ClusterAndNamespaceIndexName is the name of index that allows you to filter by cluster and namespace
 	ClusterAndNamespaceIndexName = "cluster-and-namespace"
 )
 
+// ClusterIndexFunc indexes by cluster name
 func ClusterIndexFunc(obj interface{}) ([]string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return []string{""}, fmt.Errorf("object has no meta: %v", err)
 	}
-	// return []string{meta.GetZZZ_DeprecatedClusterName()}, nil
-	index := []string{meta.GetZZZ_DeprecatedClusterName()}
-	return index, nil
+	return []string{meta.GetZZZ_DeprecatedClusterName()}, nil
 }
 
+// ClusterAndNamespaceIndexFunc indexes by cluster and namespace name
 func ClusterAndNamespaceIndexFunc(obj interface{}) ([]string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return []string{""}, fmt.Errorf("object has no meta: %v", err)
 	}
-	// return []string{meta.GetZZZ_DeprecatedClusterName() + "/" + meta.GetNamespace()}, nil
-	index := []string{meta.GetZZZ_DeprecatedClusterName() + "/" + meta.GetNamespace()}
-	return index, nil
+	// TODO(fabianvf): Should I call ClusterAwareKeyFunc on this to ensure the formatting will always match?
+	return []string{meta.GetZZZ_DeprecatedClusterName() + "/" + meta.GetNamespace()}, nil
 
 }
 
+// ClusterAwareKeyFunc keys on cluster, namespace and name
 func ClusterAwareKeyFunc(obj interface{}) (string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {

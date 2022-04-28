@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// GenericLister is a lister skin on a generic Indexer
 type GenericLister interface {
 	// List will return all objects across clusters
 	List(selector labels.Selector) (ret []runtime.Object, err error)
@@ -21,6 +22,7 @@ type GenericLister interface {
 	ByCluster(cluster logicalcluster.LogicalCluster) cache.GenericLister
 }
 
+// NewGenericLister creates a new instance for the genericLister.
 func NewGenericLister(indexer cache.Indexer, resource schema.GroupResource) GenericLister {
 	return &genericLister{indexer: indexer, resource: resource}
 }
