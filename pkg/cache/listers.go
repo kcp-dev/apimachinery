@@ -13,26 +13,24 @@ import (
 )
 
 // GenericLister is a lister skin on a generic Indexer
-type GenericLister interface {
+type GenericClusterLister interface {
 	// List will return all objects across clusters
 	List(selector labels.Selector) (ret []runtime.Object, err error)
-	// Get will attempt to retrieve assuming that name==key
-	Get(name string) (runtime.Object, error)
-	// ByCluster will give you a GenericClusterLister for one namespace
+	// ByCluster will give you a GenericLister for one namespace
 	ByCluster(cluster logicalcluster.LogicalCluster) cache.GenericLister
 }
 
-// NewGenericLister creates a new instance for the genericLister.
-func NewGenericLister(indexer cache.Indexer, resource schema.GroupResource) GenericLister {
-	return &genericLister{indexer: indexer, resource: resource}
+// NewGenericClusterLister creates a new instance for the genericClusterLister.
+func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) *genericClusterLister {
+	return &genericClusterLister{indexer: indexer, resource: resource}
 }
 
-type genericLister struct {
+type genericClusterLister struct {
 	indexer  cache.Indexer
 	resource schema.GroupResource
 }
 
-func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	if selector == nil {
 		selector = labels.NewSelector()
 	}
@@ -42,28 +40,17 @@ func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, er
 	return ret, err
 }
 
-func (s *genericLister) Get(name string) (runtime.Object, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(s.resource, name)
-	}
-	return obj.(runtime.Object), nil
+func (s *genericClusterLister) ByCluster(cluster logicalcluster.LogicalCluster) cache.GenericLister {
+	return &genericLister{indexer: s.indexer, resource: s.resource, cluster: cluster}
 }
 
-func (s *genericLister) ByCluster(cluster logicalcluster.LogicalCluster) cache.GenericLister {
-	return &genericClusterLister{indexer: s.indexer, resource: s.resource, cluster: cluster}
-}
-
-type genericClusterLister struct {
+type genericLister struct {
 	indexer  cache.Indexer
 	cluster  logicalcluster.LogicalCluster
 	resource schema.GroupResource
 }
 
-func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	selectAll := selector == nil || selector.Empty()
 	list, err := s.indexer.ByIndex(ClusterIndexName, s.cluster.String())
 	if err != nil {
@@ -91,8 +78,12 @@ func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Obj
 	return ret, err
 }
 
-func (s *genericClusterLister) Get(name string) (runtime.Object, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
+func (s *genericLister) Get(name string) (runtime.Object, error) {
+	metadata := &metav1.ObjectMeta{
+		ClusterName: s.cluster.String(),
+		Name:        name,
+	}
+	obj, exists, err := s.indexer.Get(metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +93,7 @@ func (s *genericClusterLister) Get(name string) (runtime.Object, error) {
 	return obj.(runtime.Object), nil
 }
 
-func (s *genericClusterLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
+func (s *genericLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource, cluster: s.cluster}
 }
 
@@ -116,8 +107,8 @@ type genericNamespaceLister struct {
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	selectAll := selector == nil || selector.Empty()
 	list, err := s.indexer.Index(ClusterAndNamespaceIndexName, &metav1.ObjectMeta{
-		ZZZ_DeprecatedClusterName: s.cluster.String(),
-		Namespace:                 s.namespace,
+		ClusterName: s.cluster.String(),
+		Namespace:   s.namespace,
 	})
 	if err != nil {
 		return nil, err
@@ -141,12 +132,12 @@ func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.O
 }
 
 func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
-	meta := &metav1.ObjectMeta{
-		ZZZ_DeprecatedClusterName: s.cluster.String(),
-		Namespace:                 s.namespace,
-		Name:                      name,
+	metadata := &metav1.ObjectMeta{
+		ClusterName: s.cluster.String(),
+		Namespace:   s.namespace,
+		Name:        name,
 	}
-	obj, exists, err := s.indexer.Get(meta)
+	obj, exists, err := s.indexer.Get(metadata)
 	if err != nil {
 		return nil, err
 	}
