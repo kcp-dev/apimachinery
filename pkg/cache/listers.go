@@ -33,6 +33,9 @@ type genericLister struct {
 }
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+	if selector == nil {
+		selector = labels.NewSelector()
+	}
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(runtime.Object))
 	})
@@ -61,7 +64,7 @@ type genericClusterLister struct {
 }
 
 func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	selectAll := selector.Empty()
+	selectAll := selector == nil || selector.Empty()
 	list, err := s.indexer.ByIndex(ClusterIndexName, s.cluster.String())
 	if err != nil {
 		return nil, err
@@ -111,7 +114,7 @@ type genericNamespaceLister struct {
 }
 
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	selectAll := selector.Empty()
+	selectAll := selector == nil || selector.Empty()
 	list, err := s.indexer.Index(ClusterAndNamespaceIndexName, &metav1.ObjectMeta{
 		ZZZ_DeprecatedClusterName: s.cluster.String(),
 		Namespace:                 s.namespace,
