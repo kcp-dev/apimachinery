@@ -5,7 +5,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -57,9 +56,6 @@ func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, er
 		return nil, err
 	}
 
-	if selector == nil {
-		selector = labels.Everything()
-	}
 	for i := range list {
 		item := list[i].(runtime.Object)
 		if selectAll {
@@ -79,11 +75,8 @@ func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, er
 }
 
 func (s *genericLister) Get(name string) (runtime.Object, error) {
-	metadata := &metav1.ObjectMeta{
-		ClusterName: s.cluster.String(),
-		Name:        name,
-	}
-	obj, exists, err := s.indexer.Get(metadata)
+	key := ToClusterAwareKey(s.cluster.String(), "", name)
+	obj, exists, err := s.indexer.GetByKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -106,10 +99,9 @@ type genericNamespaceLister struct {
 
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	selectAll := selector == nil || selector.Empty()
-	list, err := s.indexer.Index(ClusterAndNamespaceIndexName, &metav1.ObjectMeta{
-		ClusterName: s.cluster.String(),
-		Namespace:   s.namespace,
-	})
+
+	key := ToClusterAwareKey(s.cluster.String(), s.namespace, "")
+	list, err := s.indexer.ByIndex(ClusterAndNamespaceIndexName, key)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +124,8 @@ func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.O
 }
 
 func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
-	metadata := &metav1.ObjectMeta{
-		ClusterName: s.cluster.String(),
-		Namespace:   s.namespace,
-		Name:        name,
-	}
-	obj, exists, err := s.indexer.Get(metadata)
+	key := ToClusterAwareKey(s.cluster.String(), s.namespace, name)
+	obj, exists, err := s.indexer.GetByKey(key)
 	if err != nil {
 		return nil, err
 	}

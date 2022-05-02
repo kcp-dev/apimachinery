@@ -21,7 +21,8 @@ func ClusterIndexFunc(obj interface{}) ([]string, error) {
 	if err != nil {
 		return []string{}, fmt.Errorf("object has no meta: %v", err)
 	}
-	return []string{logicalcluster.From(meta).String()}, nil
+	clusterName := logicalcluster.From(meta).String()
+	return []string{ToClusterAwareKey(clusterName, "", "")}, nil
 }
 
 // ClusterAndNamespaceIndexFunc indexes by cluster and namespace name
@@ -30,8 +31,8 @@ func ClusterAndNamespaceIndexFunc(obj interface{}) ([]string, error) {
 	if err != nil {
 		return []string{}, fmt.Errorf("object has no meta: %v", err)
 	}
-	// TODO(fabianvf): Should I call ClusterAwareKeyFunc on this to ensure the formatting will always match?
-	return []string{logicalcluster.From(meta).String() + "/" + meta.GetNamespace()}, nil
+	clusterName := logicalcluster.From(meta).String()
+	return []string{ToClusterAwareKey(clusterName, meta.GetNamespace(), "")}, nil
 
 }
 
@@ -45,5 +46,9 @@ func ClusterAwareKeyFunc(obj interface{}) (string, error) {
 	namespace := meta.GetNamespace()
 	name := meta.GetName()
 
-	return strings.Join([]string{clusterName, namespace, name}, "/"), nil
+	return ToClusterAwareKey(clusterName, namespace, name), nil
+}
+
+func ToClusterAwareKey(cluster, namespace, name string) string {
+	return strings.Join([]string{cluster, namespace, name}, "/")
 }
