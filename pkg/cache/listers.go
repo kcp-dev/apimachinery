@@ -17,7 +17,7 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/kcp-dev/apimachinery/pkg/logicalcluster"
+	"github.com/kcp-dev/logicalcluster"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -27,12 +27,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// GenericLister is a lister skin on a generic Indexer
+// GenericClusterLister is a lister skin on a generic Indexer
 type GenericClusterLister interface {
 	// List will return all objects across clusters
 	List(selector labels.Selector) (ret []runtime.Object, err error)
-	// ByCluster will give you a GenericLister for one namespace
-	ByCluster(cluster logicalcluster.LogicalCluster) cache.GenericLister
+	// ByCluster will give you a GenericLister for one cluster
+	ByCluster(cluster logicalcluster.Name) cache.GenericLister
 }
 
 // NewGenericClusterLister creates a new instance for the genericClusterLister.
@@ -55,13 +55,13 @@ func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Obj
 	return ret, err
 }
 
-func (s *genericClusterLister) ByCluster(cluster logicalcluster.LogicalCluster) cache.GenericLister {
+func (s *genericClusterLister) ByCluster(cluster logicalcluster.Name) cache.GenericLister {
 	return &genericLister{indexer: s.indexer, resource: s.resource, cluster: cluster}
 }
 
 type genericLister struct {
 	indexer  cache.Indexer
-	cluster  logicalcluster.LogicalCluster
+	cluster  logicalcluster.Name
 	resource schema.GroupResource
 }
 
@@ -108,7 +108,7 @@ func (s *genericLister) ByNamespace(namespace string) cache.GenericNamespaceList
 
 type genericNamespaceLister struct {
 	indexer   cache.Indexer
-	cluster   logicalcluster.LogicalCluster
+	cluster   logicalcluster.Name
 	namespace string
 	resource  schema.GroupResource
 }
