@@ -1,10 +1,9 @@
 package discovery
 
 import (
-	"path"
 	"time"
 
-	"github.com/kcp-dev/apimachinery/pkg/logicalcluster"
+	"github.com/kcp-dev/logicalcluster"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/discovery"
@@ -13,7 +12,7 @@ import (
 )
 
 type ClusterDiscoveryClient interface {
-	Cluster(cluster logicalcluster.LogicalCluster) discovery.DiscoveryInterface
+	Cluster(cluster logicalcluster.Name) discovery.DiscoveryInterface
 }
 
 func NewClusterDiscoveryClientForConfig(c *restclient.Config) (ClusterDiscoveryClient, error) {
@@ -40,20 +39,16 @@ type clusterDiscoveryClient struct {
 	config     *restclient.Config
 }
 
-func (c *clusterDiscoveryClient) Cluster(cluster logicalcluster.LogicalCluster) discovery.DiscoveryInterface {
+func (c *clusterDiscoveryClient) Cluster(cluster logicalcluster.Name) discovery.DiscoveryInterface {
 	scopedConfig := restclient.CopyConfig(c.config)
 
-	// This does not parse as a URL in the rest.DefaultServerURL function
-	scopedConfig.Host = path.Join(scopedConfig.Host, cluster.Path())
+	scopedConfig.Host = scopedConfig.Host + "/" + cluster.Path()
 
-	// This does nothing AFAICT
-	// scopedConfig.APIPath = cluster.Path()
-
+	// This shouldn't be able to panic
 	return discovery.NewDiscoveryClientForConfigOrDie(scopedConfig)
 }
 
 func setDiscoveryDefaults(config *restclient.Config) error {
-	//TODO
 	defaultTimeout := 32 * time.Second
 	config.APIPath = ""
 	config.GroupVersion = nil
