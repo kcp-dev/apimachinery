@@ -19,19 +19,19 @@ package cache
 import (
 	"testing"
 
-	"github.com/kcp-dev/apimachinery/pkg/logicalcluster"
+	"github.com/kcp-dev/logicalcluster"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
-func makeObject(cluster, namespace, name string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"clusterName": cluster,
-				"namespace":   namespace,
-				"name":        name,
-			}}}
+func newUnstructured(cluster, namespace, name string, labels labels.Set) *unstructured.Unstructured {
+	u := new(unstructured.Unstructured)
+	u.SetClusterName(cluster)
+	u.SetNamespace(namespace)
+	u.SetName(name)
+	u.SetLabels(labels)
+	return u
 }
 
 func TestClusterIndexFunc(t *testing.T) {
@@ -39,11 +39,11 @@ func TestClusterIndexFunc(t *testing.T) {
 		obj     *unstructured.Unstructured
 		desired string
 	}{
-		"bare cluster":             {obj: makeObject("test", "", ""), desired: "test//"},
-		"bare cluster with dashes": {obj: makeObject("test-with-dashes", "", ""), desired: "test-with-dashes//"},
+		"bare cluster":             {obj: newUnstructured("test", "", "", nil), desired: "test//"},
+		"bare cluster with dashes": {obj: newUnstructured("test-with-dashes", "", "", nil), desired: "test-with-dashes//"},
 	}
-	for _, tt := range tests {
-		t.Run(tt.desired, func(t *testing.T) {
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
 			result, err := ClusterIndexFunc(tt.obj)
 			require.NoError(t, err, "unexpected error calling ClusterIndexFunc")
 			require.Len(t, result, 1, "ClusterIndexFunc should return one result")
@@ -64,8 +64,8 @@ func TestClusterAndNamespaceIndexFunc(t *testing.T) {
 		obj     *unstructured.Unstructured
 		desired string
 	}{
-		"bare cluster":          {obj: makeObject("test", "", ""), desired: "test//"},
-		"cluster and namespace": {obj: makeObject("test", "testing", ""), desired: "test/testing/"},
+		"bare cluster":          {obj: newUnstructured("test", "", "", nil), desired: "test//"},
+		"cluster and namespace": {obj: newUnstructured("test", "testing", "", nil), desired: "test/testing/"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desired, func(t *testing.T) {
@@ -89,9 +89,9 @@ func TestClusterAwareKeyFunc(t *testing.T) {
 		obj     *unstructured.Unstructured
 		desired string
 	}{
-		"cluster and namespace":       {obj: makeObject("cluster", "namespace", ""), desired: "cluster/namespace/"},
-		"cluster, namespace and name": {obj: makeObject("cluster", "namespace", "name"), desired: "cluster/namespace/name"},
-		"cluster and name":            {obj: makeObject("cluster", "", "name"), desired: "cluster//name"},
+		"cluster and namespace":       {obj: newUnstructured("cluster", "namespace", "", nil), desired: "cluster/namespace/"},
+		"cluster, namespace and name": {obj: newUnstructured("cluster", "namespace", "name", nil), desired: "cluster/namespace/name"},
+		"cluster and name":            {obj: newUnstructured("cluster", "", "name", nil), desired: "cluster//name"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desired, func(t *testing.T) {
