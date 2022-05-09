@@ -27,25 +27,21 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// NewGenericClusterLister creates a new instance for the GenericClusterLister.
+func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) *GenericClusterLister {
+	return &GenericClusterLister{
+		indexer:  indexer,
+		resource: resource,
+	}
+}
+
 // GenericClusterLister is a lister that supports multiple logical clusters. It can list the entire contents of the backing store, and return individual cache.GenericListers that are scoped to individual logical clusters.
-type GenericClusterLister interface {
-	// List lists every element matching the selector in the backing store, across all logical clusters.
-	List(selector labels.Selector) (ret []runtime.Object, err error)
-	// ByCluster returns a cache.GenericLister scoped to the logical cluster.
-	ByCluster(cluster logicalcluster.Name) cache.GenericLister
-}
-
-// NewGenericClusterLister creates a new instance for the genericClusterLister.
-func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) *genericClusterLister {
-	return &genericClusterLister{indexer: indexer, resource: resource}
-}
-
-type genericClusterLister struct {
+type GenericClusterLister struct {
 	indexer  cache.Indexer
 	resource schema.GroupResource
 }
 
-func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+func (s *GenericClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	if selector == nil {
 		selector = labels.NewSelector()
 	}
@@ -55,8 +51,12 @@ func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Obj
 	return ret, err
 }
 
-func (s *genericClusterLister) ByCluster(cluster logicalcluster.Name) cache.GenericLister {
-	return &genericLister{indexer: s.indexer, resource: s.resource, cluster: cluster}
+func (s *GenericClusterLister) ByCluster(cluster logicalcluster.Name) cache.GenericLister {
+	return &genericLister{
+		indexer:  s.indexer,
+		resource: s.resource,
+		cluster:  cluster,
+	}
 }
 
 type genericLister struct {
@@ -103,7 +103,12 @@ func (s *genericLister) Get(name string) (runtime.Object, error) {
 }
 
 func (s *genericLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
-	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource, cluster: s.cluster}
+	return &genericNamespaceLister{
+		indexer:   s.indexer,
+		namespace: namespace,
+		resource:  s.resource,
+		cluster:   s.cluster,
+	}
 }
 
 type genericNamespaceLister struct {
