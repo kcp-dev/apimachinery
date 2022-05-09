@@ -27,11 +27,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// GenericClusterLister is a lister skin on a generic Indexer
+// GenericClusterLister is a lister that supports multiple logical clusters. It can list the entire contents of the backing store, and return individual cache.GenericListers that are scoped to individual logical clusters.
 type GenericClusterLister interface {
-	// List will return all objects across clusters
+	// List lists every element matching the selector in the backing store, across all logical clusters.
 	List(selector labels.Selector) (ret []runtime.Object, err error)
-	// ByCluster will give you a GenericLister for one cluster
+	// ByCluster returns a cache.GenericLister scoped to the logical cluster.
 	ByCluster(cluster logicalcluster.Name) cache.GenericLister
 }
 
