@@ -67,7 +67,8 @@ type genericLister struct {
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	selectAll := selector == nil || selector.Empty()
-	list, err := s.indexer.ByIndex(ClusterIndexName, s.cluster.String())
+	key := ToClusterAwareKey(s.cluster.String(), "", "")
+	list, err := s.indexer.ByIndex(ClusterIndexName, key)
 	if err != nil {
 		return nil, err
 	}
