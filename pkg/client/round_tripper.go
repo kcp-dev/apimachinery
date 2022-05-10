@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kcp-dev/apimachinery/pkg/logicalcluster"
+	"github.com/kcp-dev/logicalcluster"
 )
 
 // ClusterRoundTripper is a cluster aware wrapper around http.RoundTripper
@@ -49,7 +49,7 @@ func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 }
 
 // generatePath formats the request path to target the specified cluster
-func generatePath(originalPath string, cluster logicalcluster.LogicalCluster) string {
+func generatePath(originalPath string, cluster logicalcluster.Name) string {
 	// start with /clusters/$name
 	path := cluster.Path()
 
@@ -70,12 +70,12 @@ const (
 )
 
 // WithCluster injects a cluster name into a context
-func WithCluster(ctx context.Context, cluster logicalcluster.LogicalCluster) context.Context {
+func WithCluster(ctx context.Context, cluster logicalcluster.Name) context.Context {
 	return context.WithValue(ctx, keyCluster, cluster)
 }
 
 // ClusterFromContext extracts a cluster name from the context
-func ClusterFromContext(ctx context.Context) (logicalcluster.LogicalCluster, bool) {
-	s, ok := ctx.Value(keyCluster).(logicalcluster.LogicalCluster)
+func ClusterFromContext(ctx context.Context) (logicalcluster.Name, bool) {
+	s, ok := ctx.Value(keyCluster).(logicalcluster.Name)
 	return s, ok
 }
