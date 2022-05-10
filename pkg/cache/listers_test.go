@@ -102,11 +102,29 @@ func TestGenericLister(t *testing.T) {
 
 				require.NoError(t, err)
 				require.Len(t, list, tt.desiredLen)
+
+				for _, item := range list {
+					obj := item.(*unstructured.Unstructured)
+
+					clusterName := logicalcluster.From(obj).String()
+					require.Equal(t, tt.cluster, clusterName)
+
+					if tt.selector != nil {
+						var labelMap labels.Set
+						labelMap = obj.GetLabels()
+						require.True(t, tt.selector.Matches(labelMap))
+					}
+				}
 			} else {
 				item, err := lister.Get(tt.name)
 				require.NoError(t, err)
-				name := item.(*unstructured.Unstructured).GetName()
+				obj := item.(*unstructured.Unstructured)
+
+				name := obj.GetName()
 				require.Equal(t, tt.name, name)
+
+				clusterName := logicalcluster.From(obj).String()
+				require.Equal(t, tt.cluster, clusterName)
 			}
 		})
 	}
@@ -115,7 +133,9 @@ func TestGenericLister(t *testing.T) {
 func TestGenericNamespaceLister(t *testing.T) {
 	indexer := newTestIndexer()
 
-	l := NewGenericClusterLister(indexer, schema.GroupResource{}).ByCluster(logicalcluster.New("c1"))
+	cluster := "c1"
+
+	l := NewGenericClusterLister(indexer, schema.GroupResource{}).ByCluster(logicalcluster.New(cluster))
 
 	tests := map[string]struct {
 		namespace  string
@@ -143,11 +163,35 @@ func TestGenericNamespaceLister(t *testing.T) {
 
 				require.NoError(t, err)
 				require.Len(t, list, tt.desiredLen)
+
+				for _, item := range list {
+					obj := item.(*unstructured.Unstructured)
+
+					clusterName := logicalcluster.From(obj).String()
+					require.Equal(t, cluster, clusterName)
+
+					namespace := obj.GetNamespace()
+					require.Equal(t, tt.namespace, namespace)
+
+					if tt.selector != nil {
+						var labelMap labels.Set
+						labelMap = obj.GetLabels()
+						require.True(t, tt.selector.Matches(labelMap))
+					}
+				}
 			} else {
 				item, err := lister.Get(tt.name)
-
 				require.NoError(t, err)
-				name := item.(*unstructured.Unstructured).GetName()
+
+				obj := item.(*unstructured.Unstructured)
+
+				clusterName := logicalcluster.From(obj).String()
+				require.Equal(t, cluster, clusterName)
+
+				namespace := obj.GetNamespace()
+				require.Equal(t, tt.namespace, namespace)
+
+				name := obj.GetName()
 				require.Equal(t, tt.name, name)
 			}
 		})

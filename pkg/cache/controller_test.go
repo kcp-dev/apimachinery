@@ -39,8 +39,9 @@ func TestClusterIndexFunc(t *testing.T) {
 		obj     *unstructured.Unstructured
 		desired string
 	}{
-		"bare cluster":             {obj: newUnstructured("test", "", "", nil), desired: "test//"},
-		"bare cluster with dashes": {obj: newUnstructured("test-with-dashes", "", "", nil), desired: "test-with-dashes//"},
+		"bare cluster":             {obj: newUnstructured("test", "", "name", nil), desired: "test//"},
+		"cluster and namespace":    {obj: newUnstructured("test", "namespace", "name", nil), desired: "test//"},
+		"bare cluster with dashes": {obj: newUnstructured("test-with-dashes", "", "name", nil), desired: "test-with-dashes//"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -50,9 +51,7 @@ func TestClusterIndexFunc(t *testing.T) {
 			require.Equal(t, result[0], tt.desired)
 
 			clusterName := logicalcluster.From(tt.obj).String()
-			namespace := tt.obj.GetNamespace()
-			name := tt.obj.GetName()
-			key := ToClusterAwareKey(clusterName, namespace, name)
+			key := ToClusterAwareKey(clusterName, "", "")
 
 			require.Equal(t, result[0], key, "ClusterIndexFunc and ToClusterAwareKey functions have diverged")
 		})
@@ -64,8 +63,8 @@ func TestClusterAndNamespaceIndexFunc(t *testing.T) {
 		obj     *unstructured.Unstructured
 		desired string
 	}{
-		"bare cluster":          {obj: newUnstructured("test", "", "", nil), desired: "test//"},
-		"cluster and namespace": {obj: newUnstructured("test", "testing", "", nil), desired: "test/testing/"},
+		"bare cluster":          {obj: newUnstructured("test", "", "name", nil), desired: "test//"},
+		"cluster and namespace": {obj: newUnstructured("test", "testing", "name", nil), desired: "test/testing/"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desired, func(t *testing.T) {
@@ -76,8 +75,7 @@ func TestClusterAndNamespaceIndexFunc(t *testing.T) {
 
 			clusterName := logicalcluster.From(tt.obj).String()
 			namespace := tt.obj.GetNamespace()
-			name := tt.obj.GetName()
-			key := ToClusterAwareKey(clusterName, namespace, name)
+			key := ToClusterAwareKey(clusterName, namespace, "")
 
 			require.Equal(t, result[0], key, "ClusterAndNamespaceIndexFunc and ToClusterAwareKey functions have diverged")
 		})
@@ -89,7 +87,6 @@ func TestClusterAwareKeyFunc(t *testing.T) {
 		obj     *unstructured.Unstructured
 		desired string
 	}{
-		"cluster and namespace":       {obj: newUnstructured("cluster", "namespace", "", nil), desired: "cluster/namespace/"},
 		"cluster, namespace and name": {obj: newUnstructured("cluster", "namespace", "name", nil), desired: "cluster/namespace/name"},
 		"cluster and name":            {obj: newUnstructured("cluster", "", "name", nil), desired: "cluster//name"},
 	}
