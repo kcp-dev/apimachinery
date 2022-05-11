@@ -19,13 +19,13 @@ package client
 import (
 	"testing"
 
-	"github.com/kcp-dev/apimachinery/pkg/logicalcluster"
+	"github.com/kcp-dev/logicalcluster"
 )
 
 func TestRoundTripper_generatePath(t *testing.T) {
 	tests := []struct {
 		originalPath string
-		cluster      logicalcluster.LogicalCluster
+		cluster      logicalcluster.Name
 		desired      string
 	}{
 		{"", logicalcluster.New("test"), "/clusters/test"},
