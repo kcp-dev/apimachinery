@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'release-*'
+  pull_request:
+    branches:
+      - main
+      - 'release-*'
+
+jobs:
+  boilerplate:
+    name: boilerplate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: logicalcluster
+      - uses: actions/checkout@v3
+        with:
+          repository: kubernetes/repo-infra
+          ref: master
+          path: repo-infra
+          fetch-depth: 1
+      - run: |
+          cd logicalcluster
+          ../repo-infra/hack/verify_boilerplate.py --boilerplate-dir=hack/boilerplate
+
+  verify-imports:
+    name: verify-imports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: hack/reject-k8s-imports.sh
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: v1.17
+      - name: Run golangci-lint
+        run: make lint
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: v1.17
+      - run: make test

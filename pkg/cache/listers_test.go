@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func newTestIndexer() cache.Indexer {
+func newTestIndexer(t *testing.T) cache.Indexer {
 	indexer := cache.NewIndexer(
 		ClusterAwareKeyFunc,
 		cache.Indexers{
@@ -36,19 +36,25 @@ func newTestIndexer() cache.Indexer {
 		})
 
 	for _, cluster := range []string{"c1", "c2"} {
-		indexer.Add(newUnstructured(cluster, "ns1", "n1", map[string]string{"app": "myapp"}))
-		indexer.Add(newUnstructured(cluster, "ns2", "n1", map[string]string{"app": "myapp"}))
-		indexer.Add(newUnstructured(cluster, "ns2", "n2", nil))
+		err := indexer.Add(newUnstructured(cluster, "ns1", "n1", map[string]string{"app": "myapp"}))
+		require.NoError(t, err)
 
-		indexer.Add(newUnstructured(cluster, "", "cn1", map[string]string{"app": "myapp"}))
-		indexer.Add(newUnstructured(cluster, "", "cn2", nil))
+		err = indexer.Add(newUnstructured(cluster, "ns2", "n1", map[string]string{"app": "myapp"}))
+		require.NoError(t, err)
+		err = indexer.Add(newUnstructured(cluster, "ns2", "n2", nil))
+		require.NoError(t, err)
+
+		err = indexer.Add(newUnstructured(cluster, "", "cn1", map[string]string{"app": "myapp"}))
+		require.NoError(t, err)
+		err = indexer.Add(newUnstructured(cluster, "", "cn2", nil))
+		require.NoError(t, err)
 	}
 
 	return indexer
 }
 
 func TestGenericClusterLister(t *testing.T) {
-	indexer := newTestIndexer()
+	indexer := newTestIndexer(t)
 
 	l := NewGenericClusterLister(indexer, schema.GroupResource{})
 
@@ -71,7 +77,7 @@ func TestGenericClusterLister(t *testing.T) {
 }
 
 func TestGenericLister(t *testing.T) {
-	indexer := newTestIndexer()
+	indexer := newTestIndexer(t)
 
 	l := NewGenericClusterLister(indexer, schema.GroupResource{})
 
@@ -110,8 +116,7 @@ func TestGenericLister(t *testing.T) {
 					require.Equal(t, tt.cluster, clusterName)
 
 					if tt.selector != nil {
-						var labelMap labels.Set
-						labelMap = obj.GetLabels()
+						var labelMap labels.Set = obj.GetLabels()
 						require.True(t, tt.selector.Matches(labelMap))
 					}
 				}
@@ -131,7 +136,7 @@ func TestGenericLister(t *testing.T) {
 }
 
 func TestGenericNamespaceLister(t *testing.T) {
-	indexer := newTestIndexer()
+	indexer := newTestIndexer(t)
 
 	cluster := "c1"
 
@@ -174,8 +179,7 @@ func TestGenericNamespaceLister(t *testing.T) {
 					require.Equal(t, tt.namespace, namespace)
 
 					if tt.selector != nil {
-						var labelMap labels.Set
-						labelMap = obj.GetLabels()
+						var labelMap labels.Set = obj.GetLabels()
 						require.True(t, tt.selector.Matches(labelMap))
 					}
 				}
