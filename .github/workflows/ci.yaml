@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          path: logicalcluster
+          path: apimachinery
       - uses: actions/checkout@v3
         with:
           repository: kubernetes/repo-infra
@@ -25,15 +25,8 @@ jobs:
           path: repo-infra
           fetch-depth: 1
       - run: |
-          cd logicalcluster
+          cd apimachinery
           ../repo-infra/hack/verify_boilerplate.py --boilerplate-dir=hack/boilerplate
-
-  verify-imports:
-    name: verify-imports
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: hack/reject-k8s-imports.sh
 
   lint:
     name: lint
