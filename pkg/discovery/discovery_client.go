@@ -69,6 +69,7 @@ func (c *ClusterDiscoveryClient) Cluster(cluster logicalcluster.Name) discovery.
 	return discovery.NewDiscoveryClientForConfigOrDie(scopedConfig)
 }
 
+// setDiscoveryDefaults sets sane defaults in the provided REST config to allow API discovery to succeed
 func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil

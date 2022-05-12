@@ -18,10 +18,8 @@ package discovery
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 
 	"github.com/kcp-dev/logicalcluster"
@@ -70,18 +68,20 @@ func TestClusterDiscoveryClient(t *testing.T) {
 			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
-			fmt.Println(req.URL)
 			return
 		}
 		output, err := json.Marshal(obj)
 		if err != nil {
-			t.Fatalf("unexpected encoding error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(output)
-		require.NoError(t, err)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}))
 
 	defer server.Close()
@@ -94,16 +94,12 @@ func TestClusterDiscoveryClient(t *testing.T) {
 	require.NoError(t, err)
 
 	groupVersions := metav1.ExtractGroupVersions(apiGroupList)
-	if !reflect.DeepEqual(groupVersions, []string{"v1", "extensions/v1beta1"}) {
-		t.Errorf("expected: %q, got: %q", []string{"v1", "extensions/v1beta1"}, groupVersions)
-	}
+	require.EqualValues(t, groupVersions, []string{"v1", "extensions/v1beta1"})
 
 	cluster2Client := client.Cluster(logicalcluster.New("cluster2"))
 	apiGroupList, err = cluster2Client.ServerGroups()
 	require.NoError(t, err)
 
 	groupVersions = metav1.ExtractGroupVersions(apiGroupList)
-	if !reflect.DeepEqual(groupVersions, []string{"v2", "extensions/v2beta2"}) {
-		t.Errorf("expected: %q, got: %q", []string{"v2", "extensions/v2beta2"}, groupVersions)
-	}
+	require.EqualValues(t, groupVersions, []string{"v2", "extensions/v2beta2"})
 }
