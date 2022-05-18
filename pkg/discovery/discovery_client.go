@@ -65,7 +65,8 @@ func (c *ClusterDiscoveryClient) Cluster(cluster logicalcluster.Name) discovery.
 
 	scopedConfig.Host = scopedConfig.Host + "/" + cluster.Path()
 
-	// This shouldn't be able to panic
+	// The original rest config has already parsed as valid. Modifying the host to scope it to a valid
+	// cluster should never result in an invalid URL, so there should be no real possibility of a panic here.
 	return discovery.NewDiscoveryClientForConfigOrDie(scopedConfig)
 }
 
