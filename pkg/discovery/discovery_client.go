@@ -70,6 +70,8 @@ func (c *ClusterDiscoveryClient) Cluster(cluster logicalcluster.Name) discovery.
 }
 
 // setDiscoveryDefaults sets sane defaults in the provided REST config to allow API discovery to succeed
+// Original source:
+// https://github.com/kubernetes/kubernetes/blob/d126b1483840b5ea7c0891d3e7a693bd50fae7f8/staging/src/k8s.io/client-go/discovery/discovery_client.go#L463
 func setDiscoveryDefaults(config *restclient.Config) error {
 	config.APIPath = ""
 	config.GroupVersion = nil
