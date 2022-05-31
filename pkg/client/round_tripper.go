@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/kcp-dev/logicalcluster"
 )
@@ -48,9 +49,18 @@ func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	return c.delegate.RoundTrip(req)
 }
 
+// apiRegex matches any string that has /api/ or /apis/ in it.
+var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
+
 // generatePath formats the request path to target the specified cluster
 func generatePath(originalPath string, cluster logicalcluster.Name) string {
-	// start with /clusters/$name
+	// If the originalPath has /api/ or /apis/ in it, it might be anywhere in the path, so we use a regex to find and
+	// replaces /api/ or /apis/ with $cluster/api/ or $cluster/apis/
+	if apiRegex.MatchString(originalPath) {
+		return apiRegex.ReplaceAllString(originalPath, fmt.Sprintf("%s$1", cluster.Path()))
+	}
+
+	// Otherwise, we're just prepending /clusters/$name
 	path := cluster.Path()
 
 	// if the original path is relative, add a / separator
@@ -60,6 +70,7 @@ func generatePath(originalPath string, cluster logicalcluster.Name) string {
 
 	// finally append the original path
 	path += originalPath
+	
 	return path
 }
 
