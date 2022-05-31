@@ -23,20 +23,57 @@ import (
 )
 
 func TestRoundTripper_generatePath(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		originalPath string
-		cluster      logicalcluster.Name
 		desired      string
 	}{
-		{"", logicalcluster.New("test"), "/clusters/test"},
-		{"/prefix/", logicalcluster.New("test"), "/clusters/test/prefix/"},
-		{"/several/divisions/of/prefix", logicalcluster.New("test"), "/clusters/test/several/divisions/of/prefix"},
-		{"/prefix", logicalcluster.New("test"), "/clusters/test/prefix"},
-		{"prefix", logicalcluster.New("test"), "/clusters/test/prefix"},
+		"empty path": {
+			desired: "/clusters/root:org:ws",
+		},
+		"single segment prefix with slashes on both ends": {
+			originalPath: "/prefix/",
+			desired:      "/clusters/root:org:ws/prefix/",
+		},
+		"multiple segments prefix": {
+			originalPath: "/several/divisions/of/prefix",
+			desired:      "/clusters/root:org:ws/several/divisions/of/prefix",
+		},
+		"single segment prefix with slash at beginning only": {
+			originalPath: "/prefix",
+			desired:      "/clusters/root:org:ws/prefix",
+		},
+		"single segment prefix with no slashes": {
+			originalPath: "prefix",
+			desired:      "/clusters/root:org:ws/prefix",
+		},
+		"/api": {
+			originalPath: "/api",
+			desired:      "/clusters/root:org:ws/api",
+		},
+		"/api/v1": {
+			originalPath: "/api/v1",
+			desired:      "/clusters/root:org:ws/api/v1",
+		},
+		"/apis": {
+			originalPath: "/apis",
+			desired:      "/clusters/root:org:ws/apis",
+		},
+		"/apis/example.io": {
+			originalPath: "/apis/example.io",
+			desired:      "/clusters/root:org:ws/apis/example.io",
+		},
+		"sample APIExport virtual workspace URL with apis": {
+			originalPath: "/services/apiexport/root:default:pub/some-export/apis/foo.io/v1alpha1/widgets",
+			desired:      "/services/apiexport/root:default:pub/some-export/clusters/root:org:ws/apis/foo.io/v1alpha1/widgets",
+		},
+		"sample APIExport virtual workspace URL with api": {
+			originalPath: "/services/apiexport/root:default:pub/some-export/api/v1/configmaps",
+			desired:      "/services/apiexport/root:default:pub/some-export/clusters/root:org:ws/api/v1/configmaps",
+		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.desired, func(t *testing.T) {
-			result := generatePath(tt.originalPath, tt.cluster)
+	for testName, tt := range tests {
+		t.Run(testName, func(t *testing.T) {
+			result := generatePath(tt.originalPath, logicalcluster.New("root:org:ws"))
 			if result != tt.desired {
 				t.Errorf("got %v, want %v", result, tt.desired)
 			}
