@@ -70,7 +70,7 @@ func generatePath(originalPath string, cluster logicalcluster.Name) string {
 
 	// finally append the original path
 	path += originalPath
-	
+
 	return path
 }
 
@@ -82,7 +82,10 @@ const (
 
 // WithCluster injects a cluster name into a context
 func WithCluster(ctx context.Context, cluster logicalcluster.Name) context.Context {
-	return context.WithValue(ctx, keyCluster, cluster)
+	if cluster.String() != "" {
+		return context.WithValue(ctx, keyCluster, cluster)
+	}
+	return ctx
 }
 
 // ClusterFromContext extracts a cluster name from the context
