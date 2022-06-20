@@ -82,7 +82,7 @@ const (
 
 // WithCluster injects a cluster name into a context
 func WithCluster(ctx context.Context, cluster logicalcluster.Name) context.Context {
-	if cluster.String() != "" {
+	if cluster.Empty() {
 		return context.WithValue(ctx, keyCluster, cluster)
 	}
 	return ctx
