@@ -67,11 +67,5 @@ func ClusterAwareKeyFunc(obj interface{}) (string, error) {
 
 // ToClusterAwareKey is a helper function that formats cluster, namespace, and name for key and index functions
 func ToClusterAwareKey(cluster, namespace, name string) string {
-	if cluster == "" {
-		if namespace == "" {
-			return name
-		}
-		return strings.Join([]string{namespace, name}, "/")
-	}
 	return strings.Join([]string{cluster, namespace, name}, "/")
 }

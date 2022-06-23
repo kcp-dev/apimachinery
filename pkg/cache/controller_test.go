@@ -42,14 +42,13 @@ func TestClusterIndexFunc(t *testing.T) {
 		"bare cluster":             {obj: newUnstructured("test", "", "name", nil), desired: "test//"},
 		"cluster and namespace":    {obj: newUnstructured("test", "namespace", "name", nil), desired: "test//"},
 		"bare cluster with dashes": {obj: newUnstructured("test-with-dashes", "", "name", nil), desired: "test-with-dashes//"},
-		"without cluster":          {obj: newUnstructured("", "test-without-cluster", "name", nil), desired: ""},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			result, err := ClusterIndexFunc(tt.obj)
 			require.NoError(t, err, "unexpected error calling ClusterIndexFunc")
 			require.Len(t, result, 1, "ClusterIndexFunc should return one result")
-			require.Equal(t, tt.desired, result[0])
+			require.Equal(t, result[0], tt.desired)
 
 			clusterName := logicalcluster.From(tt.obj).String()
 			key := ToClusterAwareKey(clusterName, "", "")
@@ -66,14 +65,13 @@ func TestClusterAndNamespaceIndexFunc(t *testing.T) {
 	}{
 		"bare cluster":          {obj: newUnstructured("test", "", "name", nil), desired: "test//"},
 		"cluster and namespace": {obj: newUnstructured("test", "testing", "name", nil), desired: "test/testing/"},
-		"without cluster":       {obj: newUnstructured("", "test-without-cluster", "name", nil), desired: "test-without-cluster/"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desired, func(t *testing.T) {
 			result, err := ClusterAndNamespaceIndexFunc(tt.obj)
 			require.NoError(t, err, "unexpected error calling ClusterAndNamespaceIndexFunc")
 			require.Len(t, result, 1, "ClusterIndexFunc should return one result")
-			require.Equal(t, tt.desired, result[0])
+			require.Equal(t, result[0], tt.desired)
 
 			clusterName := logicalcluster.From(tt.obj).String()
 			namespace := tt.obj.GetNamespace()
@@ -91,13 +89,12 @@ func TestClusterAwareKeyFunc(t *testing.T) {
 	}{
 		"cluster, namespace and name": {obj: newUnstructured("cluster", "namespace", "name", nil), desired: "cluster/namespace/name"},
 		"cluster and name":            {obj: newUnstructured("cluster", "", "name", nil), desired: "cluster//name"},
-		"without cluster":             {obj: newUnstructured("", "test-without-cluster", "name", nil), desired: "test-without-cluster/name"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desired, func(t *testing.T) {
 			keyFuncResult, err := ClusterAwareKeyFunc(tt.obj)
 			require.NoError(t, err, "unexpected error calling ClusterAwareKeyFunc")
-			require.Equal(t, tt.desired, keyFuncResult)
+			require.Equal(t, keyFuncResult, tt.desired)
 
 			clusterName := logicalcluster.From(tt.obj).String()
 			namespace := tt.obj.GetNamespace()
