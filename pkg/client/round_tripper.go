@@ -25,6 +25,11 @@ import (
 	"github.com/kcp-dev/logicalcluster"
 )
 
+// ClusterHeader set to "<lcluster>" on a request is an alternative to accessing the
+// cluster via /clusters/<lcluster>. With that the <lcluster> can be access via normal kube-like
+// /api and /apis endpoints.
+const ClusterHeader = "X-Kubernetes-Cluster"
+
 // ClusterRoundTripper is a cluster aware wrapper around http.RoundTripper
 type ClusterRoundTripper struct {
 	delegate http.RoundTripper
@@ -70,7 +75,7 @@ func generatePath(originalPath string, cluster logicalcluster.Name) string {
 
 	// finally append the original path
 	path += originalPath
-	
+
 	return path
 }
 
