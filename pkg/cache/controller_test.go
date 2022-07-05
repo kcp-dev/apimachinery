@@ -105,3 +105,38 @@ func TestClusterAwareKeyFunc(t *testing.T) {
 		})
 	}
 }
+
+func TestSplitClusterAwareKey(t *testing.T) {
+	tests := map[string]struct {
+		clusterKey  string
+		cluster     string
+		namespace   string
+		name        string
+		shouldError bool
+	}{
+		"cluster + namespace + name": {clusterKey: "c1/ns1/n1", cluster: "c1", namespace: "ns1", name: "n1"},
+		"cluster + name":             {clusterKey: "c1//n1", cluster: "c1", name: "n1"},
+		"namespace + name":           {clusterKey: "/ns1/n1", namespace: "ns1", name: "n1"},
+		"invalid":                    {clusterKey: "ns1/n1", namespace: "ns1", name: "n1", shouldError: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tt.shouldError {
+				_, _, _, err := SplitClusterAwareKey(tt.clusterKey)
+				require.Error(t, err, "An invalid cluster key should result in an error")
+				return
+			}
+			clusterAwareKey := ToClusterAwareKey(tt.cluster, tt.namespace, tt.name)
+			require.Equal(t, clusterAwareKey, tt.clusterKey, "ToClusterAwareKey has changed, these tests may need to be updated")
+
+			cluster, namespace, name, err := SplitClusterAwareKey(tt.clusterKey)
+			require.NoError(t, err, "Splitting a valid cluster-aware key should not result in an error")
+
+			require.Equal(t, cluster, tt.cluster, "cluster did not match after split")
+			require.Equal(t, namespace, tt.namespace, "namespace did not match after split")
+			require.Equal(t, name, tt.name, "name did not match after split")
+
+		})
+	}
+}
