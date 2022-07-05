@@ -69,3 +69,12 @@ func ClusterAwareKeyFunc(obj interface{}) (string, error) {
 func ToClusterAwareKey(cluster, namespace, name string) string {
 	return strings.Join([]string{cluster, namespace, name}, "/")
 }
+
+// SplitClusterAwareKey is a helper function that extracts the cluster name, namespace, and name from a cluster-aware key
+func SplitClusterAwareKey(clusterKey string) (string, string, string, error) {
+	bits := strings.Split(clusterKey, "/")
+	if len(bits) != 3 {
+		return "", "", "", fmt.Errorf("%s is not a valid cluster-aware key", clusterKey)
+	}
+	return bits[0], bits[1], bits[2], nil
+}
