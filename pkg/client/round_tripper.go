@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -38,7 +37,7 @@ func NewClusterRoundTripper(delegate http.RoundTripper) *ClusterRoundTripper {
 }
 
 func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	cluster, ok := ClusterFromContext(req.Context())
+	cluster, ok := logicalcluster.ClusterFromContext(req.Context())
 	if ok {
 		req = req.Clone(req.Context())
 		req.URL.Path = generatePath(req.URL.Path, cluster)
@@ -70,24 +69,4 @@ func generatePath(originalPath string, cluster logicalcluster.Name) string {
 	path += originalPath
 
 	return path
-}
-
-type key int
-
-const (
-	keyCluster key = iota
-)
-
-// WithCluster injects a cluster name into a context
-func WithCluster(ctx context.Context, cluster logicalcluster.Name) context.Context {
-	if !cluster.Empty() {
-		return context.WithValue(ctx, keyCluster, cluster)
-	}
-	return ctx
-}
-
-// ClusterFromContext extracts a cluster name from the context
-func ClusterFromContext(ctx context.Context) (logicalcluster.Name, bool) {
-	s, ok := ctx.Value(keyCluster).(logicalcluster.Name)
-	return s, ok
 }
