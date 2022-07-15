@@ -39,6 +39,6 @@ func NewClusterConfig(cfg *rest.Config) *rest.Config {
 // cluster endpoint.
 func ConfigWithCluster(cfg *rest.Config, clusterName logicalcluster.Name) *rest.Config {
 	r := rest.CopyConfig(cfg)
-	r.Host = r.Host + "/" + clusterName.Path()
+	r.Host = r.Host + clusterName.Path()
 	return r
 }
