@@ -62,6 +62,10 @@ func TestRoundTripper_generatePath(t *testing.T) {
 			originalPath: "/apis/example.io",
 			desired:      "/clusters/root:org:ws/apis/example.io",
 		},
+		"Path already added /clusters/root:org:ws/apis/example.io": {
+			originalPath: "/clusters/root:org:ws/apis/example.io",
+			desired:      "/clusters/root:org:ws/apis/example.io",
+		},
 		"sample APIExport virtual workspace URL with apis": {
 			originalPath: "/services/apiexport/root:default:pub/some-export/apis/foo.io/v1alpha1/widgets",
 			desired:      "/services/apiexport/root:default:pub/some-export/clusters/root:org:ws/apis/foo.io/v1alpha1/widgets",

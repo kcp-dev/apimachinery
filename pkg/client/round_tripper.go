@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/kcp-dev/logicalcluster"
 )
@@ -51,6 +52,10 @@ var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
 
 // generatePath formats the request path to target the specified cluster
 func generatePath(originalPath string, cluster logicalcluster.Name) string {
+	// If the originalPath already has cluster.Path() then the path was already modifed and no change needed
+	if strings.Contains(originalPath, cluster.Path()) {
+		return originalPath
+	}
 	// If the originalPath has /api/ or /apis/ in it, it might be anywhere in the path, so we use a regex to find and
 	// replaces /api/ or /apis/ with $cluster/api/ or $cluster/apis/
 	if apiRegex.MatchString(originalPath) {
