@@ -17,7 +17,7 @@ limitations under the License.
 package dynamic
 
 import (
-	"github.com/kcp-dev/logicalcluster"
+	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"

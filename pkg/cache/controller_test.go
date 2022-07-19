@@ -19,7 +19,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/kcp-dev/logicalcluster"
+	"github.com/kcp-dev/logicalcluster/v2"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,7 +27,7 @@ import (
 
 func newUnstructured(cluster, namespace, name string, labels labels.Set) *unstructured.Unstructured {
 	u := new(unstructured.Unstructured)
-	u.SetClusterName(cluster)
+	u.SetZZZ_DeprecatedClusterName(cluster)
 	u.SetNamespace(namespace)
 	u.SetName(name)
 	u.SetLabels(labels)

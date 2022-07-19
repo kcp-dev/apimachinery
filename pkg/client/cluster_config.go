@@ -19,7 +19,7 @@ package client
 import (
 	"net/http"
 
-	"github.com/kcp-dev/logicalcluster"
+	"github.com/kcp-dev/logicalcluster/v2"
 
 	"k8s.io/client-go/rest"
 )
