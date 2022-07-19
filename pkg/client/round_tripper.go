@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kcp-dev/logicalcluster"
+	"github.com/kcp-dev/logicalcluster/v2"
 )
 
 // ClusterRoundTripper is a cluster aware wrapper around http.RoundTripper
