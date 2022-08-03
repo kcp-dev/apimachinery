@@ -5,7 +5,7 @@ module github.com/kcp-dev/apimachinery
 go 1.18
 
 require (
-	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.0
+	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1
 	github.com/stretchr/testify v1.7.1
 	k8s.io/apimachinery v0.24.3
 	k8s.io/client-go v0.24.3
