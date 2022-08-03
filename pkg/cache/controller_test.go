@@ -27,7 +27,9 @@ import (
 
 func newUnstructured(cluster, namespace, name string, labels labels.Set) *unstructured.Unstructured {
 	u := new(unstructured.Unstructured)
-	u.SetZZZ_DeprecatedClusterName(cluster)
+	u.SetAnnotations(map[string]string{
+		logicalcluster.AnnotationKey: cluster,
+	})
 	u.SetNamespace(namespace)
 	u.SetName(name)
 	u.SetLabels(labels)
