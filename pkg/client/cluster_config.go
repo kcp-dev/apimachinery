@@ -24,21 +24,23 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// NewClusterConfig wraps an existing config's roundtripper
+// SetMultiClusterRoundTripper wraps an existing config's roundtripper
 // with a custom cluster aware roundtripper.
-func NewClusterConfig(cfg *rest.Config) *rest.Config {
-	copyCfg := rest.CopyConfig(cfg)
-	copyCfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+//
+// Note: it is the caller responsibility to make a copy of the rest config
+func SetMultiClusterRoundTripper(cfg *rest.Config) *rest.Config {
+	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return NewClusterRoundTripper(rt)
 	})
 
-	return copyCfg
+	return cfg
 }
 
-// ConfigWithCluster modifies the config host path to include the
+// SetCluster modifies the config host path to include the
 // cluster endpoint.
-func ConfigWithCluster(cfg *rest.Config, clusterName logicalcluster.Name) *rest.Config {
-	r := rest.CopyConfig(cfg)
-	r.Host = r.Host + clusterName.Path()
-	return r
+//
+// Note: it is the caller responsibility to make a copy of the rest config
+func SetCluster(cfg *rest.Config, clusterName logicalcluster.Name) *rest.Config {
+	cfg.Host = cfg.Host + clusterName.Path()
+	return cfg
 }
