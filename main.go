@@ -31,4 +31,6 @@ func main() {
 	// clusterRoleClient.Cluster(logicalcluster.New("whoa")).Get(context.TODO(), "foo", metav1.GetOptions{})
 
 	roleClient.Cluster(logicalcluster.New("dang")).Roles("default").Get(context.TODO(), "bar", metav1.GetOptions{})
+	// NOTE: for namespace-scoped resources we could technically make the above call not stutter on e.g. Roles():
+	// roleClient.Cluster(logicalcluster.New("dang")).Namespace("default").Get(context.TODO(), "foo", metav1.GetOptions{})
 }
