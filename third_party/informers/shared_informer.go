@@ -57,7 +57,7 @@ func NewSharedIndexInformer(lw cache.ListerWatcher, exampleObject runtime.Object
 	sharedIndexInformer := &sharedIndexInformer{
 		processor: &sharedProcessor{clock: realClock},
 		// KCP modification: We changed the keyfunction passed to NewIndexer
-		indexer:                         cache.NewIndexer(kcpcache.ClusterAwareKeyFunc, indexers),
+		indexer:                         cache.NewIndexer(kcpcache.MetaClusterNamespaceKeyFunc, indexers),
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
 		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
@@ -195,7 +195,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
 		// KCP modification: We changed the keyfunction passed to NewDeltaFIFOWithOptions
-		KeyFunction: kcpcache.ClusterAwareKeyFunc,
+		KeyFunction: kcpcache.MetaClusterNamespaceKeyFunc,
 	})
 
 	cfg := &cache.Config{

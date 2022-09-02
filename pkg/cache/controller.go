@@ -18,7 +18,6 @@ package cache
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,8 +36,12 @@ func ClusterIndexFunc(obj interface{}) ([]string, error) {
 	if err != nil {
 		return []string{}, fmt.Errorf("object has no meta: %v", err)
 	}
-	clusterName := logicalcluster.From(meta).String()
-	return []string{ToClusterAwareKey(clusterName, "", "")}, nil
+	return []string{ClusterIndexKey(logicalcluster.From(meta))}, nil
+}
+
+// ClusterIndexKey formats the index key for a cluster name
+func ClusterIndexKey(clusterName logicalcluster.Name) string {
+	return clusterName.String()
 }
 
 // ClusterAndNamespaceIndexFunc indexes by cluster and namespace name
@@ -47,34 +50,10 @@ func ClusterAndNamespaceIndexFunc(obj interface{}) ([]string, error) {
 	if err != nil {
 		return []string{}, fmt.Errorf("object has no meta: %v", err)
 	}
-	clusterName := logicalcluster.From(meta).String()
-	return []string{ToClusterAwareKey(clusterName, meta.GetNamespace(), "")}, nil
-
+	return []string{ClusterAndNamespaceIndexKey(logicalcluster.From(meta), meta.GetNamespace())}, nil
 }
 
-// ClusterAwareKeyFunc keys on cluster, namespace and name
-func ClusterAwareKeyFunc(obj interface{}) (string, error) {
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return "", fmt.Errorf("object has no meta: %v", err)
-	}
-	clusterName := logicalcluster.From(meta).String()
-	namespace := meta.GetNamespace()
-	name := meta.GetName()
-
-	return ToClusterAwareKey(clusterName, namespace, name), nil
-}
-
-// ToClusterAwareKey is a helper function that formats cluster, namespace, and name for key and index functions
-func ToClusterAwareKey(cluster, namespace, name string) string {
-	return strings.Join([]string{cluster, namespace, name}, "/")
-}
-
-// SplitClusterAwareKey is a helper function that extracts the cluster name, namespace, and name from a cluster-aware key
-func SplitClusterAwareKey(clusterKey string) (string, string, string, error) {
-	bits := strings.Split(clusterKey, "/")
-	if len(bits) != 3 {
-		return "", "", "", fmt.Errorf("%s is not a valid cluster-aware key", clusterKey)
-	}
-	return bits[0], bits[1], bits[2], nil
+// ClusterAndNamespaceIndexKey formats the index key for a cluster name and namespace
+func ClusterAndNamespaceIndexKey(clusterName logicalcluster.Name, namespace string) string {
+	return clusterName.String() + "/" + namespace
 }

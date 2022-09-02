@@ -48,15 +48,20 @@ func MetaClusterNamespaceKeyFunc(obj interface{}) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
+	return ToClusterAwareKey(logicalcluster.From(meta).String(), meta.GetNamespace(), meta.GetName()), nil
+}
+
+// ToClusterAwareKey formats a cluster, namespace, and name as a key.
+func ToClusterAwareKey(cluster, namespace, name string) string {
 	var key string
-	if clusterName := logicalcluster.From(meta).String(); clusterName != "" {
-		key += clusterName + "|"
+	if cluster != "" {
+		key += cluster + "|"
 	}
-	if namespace := meta.GetNamespace(); namespace != "" {
+	if namespace != "" {
 		key += namespace + "/"
 	}
-	key += meta.GetName()
-	return key, nil
+	key += name
+	return key
 }
 
 // SplitMetaClusterNamespaceKey returns the namespace and name that

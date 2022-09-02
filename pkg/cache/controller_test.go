@@ -21,29 +21,38 @@ import (
 
 	"github.com/kcp-dev/logicalcluster/v2"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func newUnstructured(cluster, namespace, name string, labels labels.Set) *unstructured.Unstructured {
-	u := new(unstructured.Unstructured)
-	u.SetAnnotations(map[string]string{
-		logicalcluster.AnnotationKey: cluster,
-	})
-	u.SetNamespace(namespace)
-	u.SetName(name)
-	u.SetLabels(labels)
-	return u
-}
 
 func TestClusterIndexFunc(t *testing.T) {
 	tests := map[string]struct {
-		obj     *unstructured.Unstructured
+		obj     *metav1.ObjectMeta
 		desired string
 	}{
-		"bare cluster":             {obj: newUnstructured("test", "", "name", nil), desired: "test//"},
-		"cluster and namespace":    {obj: newUnstructured("test", "namespace", "name", nil), desired: "test//"},
-		"bare cluster with dashes": {obj: newUnstructured("test-with-dashes", "", "name", nil), desired: "test-with-dashes//"},
+		"bare cluster": {
+			obj: &metav1.ObjectMeta{
+				Namespace:   "",
+				Name:        "name",
+				Annotations: map[string]string{logicalcluster.AnnotationKey: "test"},
+			},
+			desired: "test",
+		},
+		"cluster and namespace": {
+			obj: &metav1.ObjectMeta{
+				Namespace:   "namespace",
+				Name:        "name",
+				Annotations: map[string]string{logicalcluster.AnnotationKey: "test"},
+			},
+			desired: "test",
+		},
+		"bare cluster with dashes": {
+			obj: &metav1.ObjectMeta{
+				Namespace:   "",
+				Name:        "name",
+				Annotations: map[string]string{logicalcluster.AnnotationKey: "test-with-dashes"},
+			},
+			desired: "test-with-dashes",
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -52,21 +61,34 @@ func TestClusterIndexFunc(t *testing.T) {
 			require.Len(t, result, 1, "ClusterIndexFunc should return one result")
 			require.Equal(t, result[0], tt.desired)
 
-			clusterName := logicalcluster.From(tt.obj).String()
-			key := ToClusterAwareKey(clusterName, "", "")
+			key := ClusterIndexKey(logicalcluster.From(tt.obj))
 
-			require.Equal(t, result[0], key, "ClusterIndexFunc and ToClusterAwareKey functions have diverged")
+			require.Equal(t, result[0], key, "ClusterIndexFunc and ClusterIndexKey functions have diverged")
 		})
 	}
 }
 
 func TestClusterAndNamespaceIndexFunc(t *testing.T) {
 	tests := map[string]struct {
-		obj     *unstructured.Unstructured
+		obj     *metav1.ObjectMeta
 		desired string
 	}{
-		"bare cluster":          {obj: newUnstructured("test", "", "name", nil), desired: "test//"},
-		"cluster and namespace": {obj: newUnstructured("test", "testing", "name", nil), desired: "test/testing/"},
+		"bare cluster": {
+			obj: &metav1.ObjectMeta{
+				Namespace:   "",
+				Name:        "name",
+				Annotations: map[string]string{logicalcluster.AnnotationKey: "test"},
+			},
+			desired: "test/",
+		},
+		"cluster and namespace": {
+			obj: &metav1.ObjectMeta{
+				Namespace:   "testing",
+				Name:        "name",
+				Annotations: map[string]string{logicalcluster.AnnotationKey: "test"},
+			},
+			desired: "test/testing",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.desired, func(t *testing.T) {
@@ -75,70 +97,9 @@ func TestClusterAndNamespaceIndexFunc(t *testing.T) {
 			require.Len(t, result, 1, "ClusterIndexFunc should return one result")
 			require.Equal(t, result[0], tt.desired)
 
-			clusterName := logicalcluster.From(tt.obj).String()
-			namespace := tt.obj.GetNamespace()
-			key := ToClusterAwareKey(clusterName, namespace, "")
+			key := ClusterAndNamespaceIndexKey(logicalcluster.From(tt.obj), tt.obj.GetNamespace())
 
-			require.Equal(t, result[0], key, "ClusterAndNamespaceIndexFunc and ToClusterAwareKey functions have diverged")
-		})
-	}
-}
-
-func TestClusterAwareKeyFunc(t *testing.T) {
-	tests := map[string]struct {
-		obj     *unstructured.Unstructured
-		desired string
-	}{
-		"cluster, namespace and name": {obj: newUnstructured("cluster", "namespace", "name", nil), desired: "cluster/namespace/name"},
-		"cluster and name":            {obj: newUnstructured("cluster", "", "name", nil), desired: "cluster//name"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.desired, func(t *testing.T) {
-			keyFuncResult, err := ClusterAwareKeyFunc(tt.obj)
-			require.NoError(t, err, "unexpected error calling ClusterAwareKeyFunc")
-			require.Equal(t, keyFuncResult, tt.desired)
-
-			clusterName := logicalcluster.From(tt.obj).String()
-			namespace := tt.obj.GetNamespace()
-			name := tt.obj.GetName()
-
-			key := ToClusterAwareKey(clusterName, namespace, name)
-			require.Equal(t, key, keyFuncResult, "ClusterAwareKeyFunc and ToClusterAwareKey functions have diverged")
-		})
-	}
-}
-
-func TestSplitClusterAwareKey(t *testing.T) {
-	tests := map[string]struct {
-		clusterKey  string
-		cluster     string
-		namespace   string
-		name        string
-		shouldError bool
-	}{
-		"cluster + namespace + name": {clusterKey: "c1/ns1/n1", cluster: "c1", namespace: "ns1", name: "n1"},
-		"cluster + name":             {clusterKey: "c1//n1", cluster: "c1", name: "n1"},
-		"namespace + name":           {clusterKey: "/ns1/n1", namespace: "ns1", name: "n1"},
-		"invalid":                    {clusterKey: "ns1/n1", namespace: "ns1", name: "n1", shouldError: true},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			if tt.shouldError {
-				_, _, _, err := SplitClusterAwareKey(tt.clusterKey)
-				require.Error(t, err, "An invalid cluster key should result in an error")
-				return
-			}
-			clusterAwareKey := ToClusterAwareKey(tt.cluster, tt.namespace, tt.name)
-			require.Equal(t, clusterAwareKey, tt.clusterKey, "ToClusterAwareKey has changed, these tests may need to be updated")
-
-			cluster, namespace, name, err := SplitClusterAwareKey(tt.clusterKey)
-			require.NoError(t, err, "Splitting a valid cluster-aware key should not result in an error")
-
-			require.Equal(t, cluster, tt.cluster, "cluster did not match after split")
-			require.Equal(t, namespace, tt.namespace, "namespace did not match after split")
-			require.Equal(t, name, tt.name, "name did not match after split")
-
+			require.Equal(t, result[0], key, "ClusterAndNamespaceIndexFunc and ClusterAndNamespaceIndexKey functions have diverged")
 		})
 	}
 }
