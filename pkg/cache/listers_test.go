@@ -27,9 +27,20 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+func newUnstructured(cluster, namespace, name string, labels labels.Set) *unstructured.Unstructured {
+	u := new(unstructured.Unstructured)
+	u.SetAnnotations(map[string]string{
+		logicalcluster.AnnotationKey: cluster,
+	})
+	u.SetNamespace(namespace)
+	u.SetName(name)
+	u.SetLabels(labels)
+	return u
+}
+
 func newTestIndexer(t *testing.T) cache.Indexer {
 	indexer := cache.NewIndexer(
-		ClusterAwareKeyFunc,
+		MetaClusterNamespaceKeyFunc,
 		cache.Indexers{
 			ClusterIndexName:             ClusterIndexFunc,
 			ClusterAndNamespaceIndexName: ClusterAndNamespaceIndexFunc,

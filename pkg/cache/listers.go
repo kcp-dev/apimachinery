@@ -79,8 +79,7 @@ type genericLister struct {
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	selectAll := selector == nil || selector.Empty()
-	key := ToClusterAwareKey(s.cluster.String(), "", "")
-	list, err := s.indexer.ByIndex(ClusterIndexName, key)
+	list, err := s.indexer.ByIndex(ClusterIndexName, ClusterIndexKey(s.cluster))
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +133,7 @@ type genericNamespaceLister struct {
 func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	selectAll := selector == nil || selector.Empty()
 
-	key := ToClusterAwareKey(s.cluster.String(), s.namespace, "")
-	list, err := s.indexer.ByIndex(ClusterAndNamespaceIndexName, key)
+	list, err := s.indexer.ByIndex(ClusterAndNamespaceIndexName, ClusterAndNamespaceIndexKey(s.cluster, s.namespace))
 	if err != nil {
 		return nil, err
 	}
