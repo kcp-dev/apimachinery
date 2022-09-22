@@ -27,8 +27,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ cache.GenericLister = &GenericClusterLister{}
-
 // NewGenericClusterLister creates a new instance for the GenericClusterLister.
 func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) *GenericClusterLister {
 	return &GenericClusterLister{
@@ -59,16 +57,6 @@ func (s *GenericClusterLister) ByCluster(cluster logicalcluster.Name) cache.Gene
 		resource: s.resource,
 		cluster:  cluster,
 	}
-}
-
-// ByNamespace allows GenericClusterLister to implement cache.GenericLister
-func (s *GenericClusterLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
-	panic("Calling 'ByNamespace' is not supported before scoping lister to a workspace")
-}
-
-// Get allows GenericClusterLister to implement cache.GenericLister
-func (s *GenericClusterLister) Get(name string) (runtime.Object, error) {
-	panic("Calling 'Get' is not supported before scoping lister to a workspace")
 }
 
 type genericLister struct {
