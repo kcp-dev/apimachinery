@@ -27,15 +27,16 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// NewGenericClusterLister creates a new instance for the genericClusterLister.
-func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) GenericClusterLister {
-	return &genericClusterLister{
+// NewGenericClusterLister creates a new instance for the ClusterLister.
+func NewGenericClusterLister(indexer cache.Indexer, resource schema.GroupResource) *ClusterLister {
+	return &ClusterLister{
 		indexer:  indexer,
 		resource: resource,
 	}
 }
 
-// GenericClusterLister is a lister skin on a generic Indexer
+// GenericClusterLister is a lister that can either list all objects across all logical clusters, or
+// scope down to a lister for one logical cluster only.
 type GenericClusterLister interface {
 	// List will return all objects across logical clusters and all namespaces
 	List(selector labels.Selector) (ret []runtime.Object, err error)
@@ -43,13 +44,13 @@ type GenericClusterLister interface {
 	ByCluster(cluster logicalcluster.Name) cache.GenericLister
 }
 
-// genericClusterLister is a lister that supports multiple logical clusters. It can list the entire contents of the backing store, and return individual cache.GenericListers that are scoped to individual logical clusters.
-type genericClusterLister struct {
+// ClusterLister is a lister that supports multiple logical clusters. It can list the entire contents of the backing store, and return individual cache.GenericListers that are scoped to individual logical clusters.
+type ClusterLister struct {
 	indexer  cache.Indexer
 	resource schema.GroupResource
 }
 
-func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+func (s *ClusterLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	if selector == nil {
 		selector = labels.NewSelector()
 	}
@@ -59,7 +60,7 @@ func (s *genericClusterLister) List(selector labels.Selector) (ret []runtime.Obj
 	return ret, err
 }
 
-func (s *genericClusterLister) ByCluster(cluster logicalcluster.Name) cache.GenericLister {
+func (s *ClusterLister) ByCluster(cluster logicalcluster.Name) cache.GenericLister {
 	return &genericLister{
 		indexer:  s.indexer,
 		resource: s.resource,

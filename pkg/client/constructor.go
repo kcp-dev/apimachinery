@@ -24,15 +24,18 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// Constructor is a wrapper around a constructor method for the client of type R.
 type Constructor[R any] struct {
 	NewForConfigAndClient func(*rest.Config, *http.Client) (R, error)
 }
 
+// Cache is a client factory that caches previous results.
 type Cache[R any] interface {
 	ClusterOrDie(name logicalcluster.Name) R
 	Cluster(name logicalcluster.Name) (R, error)
 }
 
+// NewCache creates a new client factory cache using the given constructor.
 func NewCache[R any](cfg *rest.Config, client *http.Client, constructor *Constructor[R]) Cache[R] {
 	return &clientCache[R]{
 		cfg:         cfg,
@@ -53,6 +56,8 @@ type clientCache[R any] struct {
 	clientsByCluster map[logicalcluster.Name]R
 }
 
+// ClusterOrDie returns a new client scoped to the given logical cluster, or panics if there
+// is any error.
 func (c *clientCache[R]) ClusterOrDie(name logicalcluster.Name) R {
 	client, err := c.Cluster(name)
 	if err != nil {
@@ -64,6 +69,7 @@ func (c *clientCache[R]) ClusterOrDie(name logicalcluster.Name) R {
 	return client
 }
 
+// Cluster returns a new client scoped to the given logical cluster.
 func (c *clientCache[R]) Cluster(name logicalcluster.Name) (R, error) {
 	c.RLock()
 	if cachedClient, exists := c.clientsByCluster[name]; exists {
