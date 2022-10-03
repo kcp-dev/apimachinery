@@ -19,7 +19,7 @@ GO_INSTALL = ./hack/go-install.sh
 TOOLS_DIR=hack/tools
 GOBIN_DIR := $(abspath $(TOOLS_DIR))
 
-GOLANGCI_LINT_VER := v1.44.2
+GOLANGCI_LINT_VER := v1.49.0
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(GOBIN_DIR)/$(GOLANGCI_LINT_BIN)-$(GOLANGCI_LINT_VER)
 

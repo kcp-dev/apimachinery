@@ -216,7 +216,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 
 		s.controller = cache.New(cfg)
 
-		// KCP modification: we removed setting the s.controller.clock here
+		// KCP modification: we removed setting the s.controller.clock here as it's an unexported field we can't access
 
 		s.started = true
 	}()
