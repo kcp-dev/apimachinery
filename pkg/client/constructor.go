@@ -71,11 +71,14 @@ func (c *clientCache[R]) ClusterOrDie(name logicalcluster.Name) R {
 
 // Cluster returns a new client scoped to the given logical cluster.
 func (c *clientCache[R]) Cluster(name logicalcluster.Name) (R, error) {
+	var cachedClient R
+	var exists bool
 	c.RLock()
-	if cachedClient, exists := c.clientsByCluster[name]; exists {
+	cachedClient, exists = c.clientsByCluster[name]
+	c.RUnlock()
+	if exists {
 		return cachedClient, nil
 	}
-	c.RUnlock()
 
 	cfg := SetCluster(rest.CopyConfig(c.cfg), name)
 	instance, err := c.constructor.NewForConfigAndClient(cfg, c.client)
@@ -86,7 +89,8 @@ func (c *clientCache[R]) Cluster(name logicalcluster.Name) (R, error) {
 
 	c.Lock()
 	defer c.Unlock()
-	if cachedClient, exists := c.clientsByCluster[name]; exists {
+	cachedClient, exists = c.clientsByCluster[name]
+	if exists {
 		return cachedClient, nil
 	}
 
