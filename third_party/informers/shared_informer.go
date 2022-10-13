@@ -24,6 +24,7 @@ import (
 	"time"
 
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -52,7 +53,7 @@ func NewSharedInformer(lw cache.ListerWatcher, exampleObject runtime.Object, def
 // requested before the informer starts and the
 // defaultEventHandlerResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
-func NewSharedIndexInformer(lw cache.ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+func NewSharedIndexInformer(lw cache.ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers cache.Indexers) kcpcache.ScopeableSharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
 		processor: &sharedProcessor{clock: realClock},
@@ -125,6 +126,13 @@ type sharedIndexInformer struct {
 	watchErrorHandler cache.WatchErrorHandler
 
 	transform cache.TransformFunc
+}
+
+func (s *sharedIndexInformer) Cluster(cluster logicalcluster.Name) cache.SharedIndexInformer {
+	return &scopedSharedIndexInformer{
+		sharedIndexInformer: s,
+		cluster:             cluster,
+	}
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
