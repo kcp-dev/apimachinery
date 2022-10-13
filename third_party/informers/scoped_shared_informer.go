@@ -23,17 +23,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var _ cache.SharedIndexInformer = (*sharedIndexInformer)(nil)
-
-// ScopeSharedIndexInformer wraps a shared index informer to scope all future event
-// handlers to events from a specific cluster.
-func ScopeSharedIndexInformer(informer cache.SharedIndexInformer, cluster logicalcluster.Name) cache.SharedIndexInformer {
-	return &scopedSharedIndexInformer{
-		sharedIndexInformer: informer.(*sharedIndexInformer),
-		cluster:             cluster,
-	}
-}
-
 // scopedSharedIndexInformer ensures that event handlers added to the underlying
 // informer are only called with objects matching the given logical cluster
 type scopedSharedIndexInformer struct {
