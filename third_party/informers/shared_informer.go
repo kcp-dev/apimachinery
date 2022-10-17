@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -76,6 +77,8 @@ const (
 	// initialBufferSize is the initial number of event notifications that can be buffered.
 	initialBufferSize = 1024
 )
+
+var _ kcpcache.CancellableEventHandlerRegistrar = (*sharedIndexInformer)(nil)
 
 // `*sharedIndexInformer` implements SharedIndexInformer and has three
 // main components.  One is an indexed local cache, `indexer cache.Indexer`.
@@ -315,7 +318,19 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
+func (s *sharedIndexInformer) AddCancellableEventHandler(handler kcpcache.CancellableResourceEventHandler) {
+	s.addCancellableEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod, handler.Done())
+}
+
+func (s *sharedIndexInformer) AddCancellableEventHandlerWithResyncPeriod(handler kcpcache.CancellableResourceEventHandler, resyncPeriod time.Duration) {
+	s.addCancellableEventHandlerWithResyncPeriod(handler, resyncPeriod, handler.Done())
+}
+
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) {
+	s.addCancellableEventHandlerWithResyncPeriod(handler, resyncPeriod, nil)
+}
+
+func (s *sharedIndexInformer) addCancellableEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration, done <-chan struct{}) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -345,6 +360,9 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 	}
 
 	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
+	if done != nil {
+		listener.doneCh = done
+	}
 
 	if !s.started {
 		s.processor.addListener(listener)
@@ -421,8 +439,8 @@ func (s *sharedIndexInformer) OnDelete(old interface{}) {
 type sharedProcessor struct {
 	listenersStarted bool
 	listenersLock    sync.RWMutex
-	listeners        []*processorListener
-	syncingListeners []*processorListener
+	listeners        map[uuid.UUID]*processorListener
+	syncingListeners map[uuid.UUID]*processorListener
 	clock            clock.Clock
 	wg               wait.Group
 }
@@ -439,8 +457,29 @@ func (p *sharedProcessor) addListener(listener *processorListener) {
 }
 
 func (p *sharedProcessor) addListenerLocked(listener *processorListener) {
-	p.listeners = append(p.listeners, listener)
-	p.syncingListeners = append(p.syncingListeners, listener)
+	var id uuid.UUID
+	for {
+		id = uuid.New()
+		if _, exists := p.listeners[id]; !exists {
+			break
+		}
+	}
+	p.listeners[id] = listener
+	p.syncingListeners[id] = listener
+	if listener.doneCh != nil {
+		go func(id uuid.UUID) {
+			<-listener.doneCh
+			p.removeListener(id)
+		}(id)
+	}
+}
+
+func (p *sharedProcessor) removeListener(id uuid.UUID) {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+	close(p.listeners[id].addCh) // Tell .pop() to stop. .pop() will tell .run() to stop
+	delete(p.listeners, id)
+	delete(p.syncingListeners, id)
 }
 
 func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
@@ -483,16 +522,16 @@ func (p *sharedProcessor) shouldResync() bool {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
-	p.syncingListeners = []*processorListener{}
+	p.syncingListeners = map[uuid.UUID]*processorListener{}
 
 	resyncNeeded := false
 	now := p.clock.Now()
-	for _, listener := range p.listeners {
+	for id, listener := range p.listeners {
 		// need to loop through all the listeners to see if they need to resync so we can prepare any
 		// listeners that are going to be resyncing.
 		if listener.shouldResync(now) {
 			resyncNeeded = true
-			p.syncingListeners = append(p.syncingListeners, listener)
+			p.syncingListeners[id] = listener
 			listener.determineNextResync(now)
 		}
 	}
@@ -523,6 +562,7 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 type processorListener struct {
 	nextCh chan interface{}
 	addCh  chan interface{}
+	doneCh <-chan struct{}
 
 	handler cache.ResourceEventHandler
 

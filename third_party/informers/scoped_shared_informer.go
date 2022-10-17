@@ -19,9 +19,12 @@ package informers
 import (
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/client-go/tools/cache"
 )
+
+var _ kcpcache.CancellableEventHandlerRegistrar = (*scopedSharedIndexInformer)(nil)
 
 // scopedSharedIndexInformer ensures that event handlers added to the underlying
 // informer are only called with objects matching the given logical cluster
@@ -34,7 +37,7 @@ type scopedSharedIndexInformer struct {
 // period.  Events to a single handler are delivered sequentially, but there is no coordination
 // between different handlers.
 func (s *scopedSharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) {
-	s.AddEventHandlerWithResyncPeriod(handler, s.sharedIndexInformer.defaultEventHandlerResyncPeriod)
+	s.addCancellableEventHandlerWithResyncPeriod(handler, s.sharedIndexInformer.defaultEventHandlerResyncPeriod, nil)
 }
 
 // AddEventHandlerWithResyncPeriod adds an event handler to the
@@ -52,6 +55,10 @@ func (s *scopedSharedIndexInformer) AddEventHandler(handler cache.ResourceEventH
 // because the implementation takes time to do work and there may
 // be competing load and scheduling noise.
 func (s *scopedSharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) {
+	s.addCancellableEventHandlerWithResyncPeriod(handler, resyncPeriod, nil)
+}
+
+func (s *scopedSharedIndexInformer) addCancellableEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration, done <-chan struct{}) {
 	scopedHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if s.objectMatches(obj) {
@@ -78,4 +85,12 @@ func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
 		return false
 	}
 	return logicalcluster.From(metaObj) == s.cluster
+}
+
+func (s *scopedSharedIndexInformer) AddCancellableEventHandler(handler kcpcache.CancellableResourceEventHandler) {
+	s.addCancellableEventHandlerWithResyncPeriod(handler, s.sharedIndexInformer.defaultEventHandlerResyncPeriod, handler.Done())
+}
+
+func (s *scopedSharedIndexInformer) AddCancellableEventHandlerWithResyncPeriod(handler kcpcache.CancellableResourceEventHandler, resyncPeriod time.Duration) {
+	s.addCancellableEventHandlerWithResyncPeriod(handler, s.sharedIndexInformer.defaultEventHandlerResyncPeriod, handler.Done())
 }
