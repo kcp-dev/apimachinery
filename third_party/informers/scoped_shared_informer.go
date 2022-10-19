@@ -19,6 +19,7 @@ package informers
 import (
 	"time"
 
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/client-go/tools/cache"
 )
@@ -73,9 +74,13 @@ func (s *scopedSharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cach
 }
 
 func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
-	metaObj, ok := obj.(logicalcluster.Object)
-	if !ok {
+	key, err := kcpcache.MetaClusterNamespaceKeyFunc(obj)
+	if err != nil {
 		return false
 	}
-	return logicalcluster.From(metaObj) == s.cluster
+	cluster, _, _, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+	if err != nil {
+		return false
+	}
+	return cluster == s.cluster
 }
