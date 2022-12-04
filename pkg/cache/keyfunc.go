@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/tools/cache"
 )
@@ -75,14 +76,14 @@ func SplitMetaClusterNamespaceKey(key string) (clusterName logicalcluster.Name, 
 		if err != nil {
 			err = invalidKey
 		}
-		return logicalcluster.Name{}, namespace, name, err
+		return "", namespace, name, err
 	case 2:
 		namespace, name, err := cache.SplitMetaNamespaceKey(outerParts[1])
 		if err != nil {
 			err = invalidKey
 		}
-		return logicalcluster.New(outerParts[0]), namespace, name, err
+		return logicalcluster.Name(outerParts[0]), namespace, name, err
 	default:
-		return logicalcluster.Name{}, "", "", invalidKey
+		return "", "", "", invalidKey
 	}
 }

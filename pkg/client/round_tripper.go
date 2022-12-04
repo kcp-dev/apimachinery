@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 // ClusterRoundTripper is a cluster aware wrapper around http.RoundTripper
@@ -41,8 +41,8 @@ func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 	cluster, ok := logicalcluster.ClusterFromContext(req.Context())
 	if ok {
 		req = req.Clone(req.Context())
-		req.URL.Path = generatePath(req.URL.Path, cluster)
-		req.URL.RawPath = generatePath(req.URL.RawPath, cluster)
+		req.URL.Path = generatePath(req.URL.Path, cluster.Path())
+		req.URL.RawPath = generatePath(req.URL.RawPath, cluster.Path())
 	}
 	return c.delegate.RoundTrip(req)
 }
@@ -51,19 +51,19 @@ func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
 
 // generatePath formats the request path to target the specified cluster
-func generatePath(originalPath string, cluster logicalcluster.Name) string {
+func generatePath(originalPath string, clusterPath logicalcluster.Path) string {
 	// If the originalPath already has cluster.Path() then the path was already modifed and no change needed
-	if strings.Contains(originalPath, cluster.Path()) {
+	if strings.Contains(originalPath, clusterPath.RequestPath()) {
 		return originalPath
 	}
 	// If the originalPath has /api/ or /apis/ in it, it might be anywhere in the path, so we use a regex to find and
 	// replaces /api/ or /apis/ with $cluster/api/ or $cluster/apis/
 	if apiRegex.MatchString(originalPath) {
-		return apiRegex.ReplaceAllString(originalPath, fmt.Sprintf("%s$1", cluster.Path()))
+		return apiRegex.ReplaceAllString(originalPath, fmt.Sprintf("%s$1", clusterPath.RequestPath()))
 	}
 
 	// Otherwise, we're just prepending /clusters/$name
-	path := cluster.Path()
+	path := clusterPath.RequestPath()
 
 	// if the original path is relative, add a / separator
 	if len(originalPath) > 0 && originalPath[0] != '/' {

@@ -19,16 +19,18 @@ package informers
 import (
 	"time"
 
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/client-go/tools/cache"
+
+	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
 )
 
 // scopedSharedIndexInformer ensures that event handlers added to the underlying
 // informer are only called with objects matching the given logical cluster
 type scopedSharedIndexInformer struct {
 	*sharedIndexInformer
-	cluster logicalcluster.Name
+	clusterName logicalcluster.Name
 }
 
 // AddEventHandler adds an event handler to the shared informer using the shared informer's resync
@@ -82,5 +84,5 @@ func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
 	if err != nil {
 		return false
 	}
-	return cluster == s.cluster
+	return cluster == s.clusterName
 }

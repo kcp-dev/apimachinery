@@ -21,7 +21,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -156,14 +157,14 @@ func TestSplitMetaClusterNamespaceKey(t *testing.T) {
 		{
 			name:              "fully populated key",
 			key:               "clusterName|namespace/name",
-			expectedCluster:   logicalcluster.New("clusterName"),
+			expectedCluster:   logicalcluster.Name("clusterName"),
 			expectedNamespace: "namespace",
 			expectedName:      "name",
 		},
 		{
 			name:            "cluster-scoped resource",
 			key:             "clusterName|name",
-			expectedCluster: logicalcluster.New("clusterName"),
+			expectedCluster: logicalcluster.Name("clusterName"),
 			expectedName:    "name",
 		},
 		{
@@ -185,7 +186,7 @@ func TestSplitMetaClusterNamespaceKey(t *testing.T) {
 		{
 			name:            "valid cluster, invalid key",
 			key:             "root:something|//2",
-			expectedCluster: logicalcluster.New("root:something"),
+			expectedCluster: logicalcluster.Name("root:something"),
 			expectedErr:     errors.New(`unexpected key format: "root:something|//2"`),
 		},
 	}
@@ -196,7 +197,7 @@ func TestSplitMetaClusterNamespaceKey(t *testing.T) {
 				t.Errorf("%s: invalid error: %v", testCase.name, diff)
 				return
 			}
-			if diff := cmp.Diff(actualCluster, testCase.expectedCluster, cmp.AllowUnexported(logicalcluster.Name{})); diff != "" {
+			if diff := cmp.Diff(actualCluster, testCase.expectedCluster); diff != "" {
 				t.Errorf("%s: invalid cluster: %v", testCase.name, diff)
 			}
 			if diff := cmp.Diff(actualNamespace, testCase.expectedNamespace); diff != "" {
