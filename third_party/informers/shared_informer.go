@@ -34,7 +34,7 @@ import (
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
 
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 )
 
 // NewSharedInformer creates a new instance for the listwatcher.

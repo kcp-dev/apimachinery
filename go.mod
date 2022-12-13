@@ -1,6 +1,4 @@
-// This is a generated file. Do not edit directly.
-
-module github.com/kcp-dev/apimachinery
+module github.com/kcp-dev/apimachinery/v2
 
 go 1.18
 

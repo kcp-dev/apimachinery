@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 )
 
 // scopedSharedIndexInformer ensures that event handlers added to the underlying
