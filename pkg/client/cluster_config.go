@@ -19,7 +19,7 @@ package client
 import (
 	"net/http"
 
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	"k8s.io/client-go/rest"
 )
@@ -40,7 +40,7 @@ func SetMultiClusterRoundTripper(cfg *rest.Config) *rest.Config {
 // cluster endpoint.
 //
 // Note: it is the caller responsibility to make a copy of the rest config
-func SetCluster(cfg *rest.Config, clusterName logicalcluster.Name) *rest.Config {
-	cfg.Host = cfg.Host + clusterName.Path()
+func SetCluster(cfg *rest.Config, clusterPath logicalcluster.Path) *rest.Config {
+	cfg.Host = cfg.Host + clusterPath.RequestPath()
 	return cfg
 }

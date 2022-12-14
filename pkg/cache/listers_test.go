@@ -19,8 +19,9 @@ package cache
 import (
 	"testing"
 
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -112,7 +113,7 @@ func TestGenericLister(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			lister := l.ByCluster(logicalcluster.New(tt.cluster))
+			lister := l.ByCluster(logicalcluster.Name(tt.cluster))
 
 			if tt.name == "" {
 				list, err := lister.List(tt.selector)
@@ -151,7 +152,7 @@ func TestGenericNamespaceLister(t *testing.T) {
 
 	cluster := "c1"
 
-	l := NewGenericClusterLister(indexer, schema.GroupResource{}).ByCluster(logicalcluster.New(cluster))
+	l := NewGenericClusterLister(indexer, schema.GroupResource{}).ByCluster(logicalcluster.Name(cluster))
 
 	tests := map[string]struct {
 		namespace  string

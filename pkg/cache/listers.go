@@ -17,30 +17,30 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/kcp-dev/logicalcluster/v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 // ListAllByCluster used to list items belongs to a cluster from Indexer.
-func ListAllByCluster(indexer cache.Indexer, cluster logicalcluster.Name, selector labels.Selector, appendFn cache.AppendFunc) error {
-	return listAllByIndexWithBackup(indexer, ClusterIndexName, ClusterIndexKey(cluster), ClusterIndexFunc, selector, appendFn)
+func ListAllByCluster(indexer cache.Indexer, clusterName logicalcluster.Name, selector labels.Selector, appendFn cache.AppendFunc) error {
+	return listAllByIndexWithBackup(indexer, ClusterIndexName, ClusterIndexKey(clusterName), ClusterIndexFunc, selector, appendFn)
 }
 
 // ListAllByClusterAndNamespace used to list items belongs to a cluster and namespace from Indexer.
-func ListAllByClusterAndNamespace(indexer cache.Indexer, cluster logicalcluster.Name, namespace string, selector labels.Selector, appendFn cache.AppendFunc) error {
+func ListAllByClusterAndNamespace(indexer cache.Indexer, clusterName logicalcluster.Name, namespace string, selector labels.Selector, appendFn cache.AppendFunc) error {
 	if namespace == metav1.NamespaceAll {
-		return ListAllByCluster(indexer, cluster, selector, appendFn)
+		return ListAllByCluster(indexer, clusterName, selector, appendFn)
 	}
-	return listAllByIndexWithBackup(indexer, ClusterAndNamespaceIndexName, ClusterAndNamespaceIndexKey(cluster, namespace), ClusterAndNamespaceIndexFunc, selector, appendFn)
+	return listAllByIndexWithBackup(indexer, ClusterAndNamespaceIndexName, ClusterAndNamespaceIndexKey(clusterName, namespace), ClusterAndNamespaceIndexFunc, selector, appendFn)
 }
 
 // listAllByIndexWithBackup used to list items from the Indexer using an index, or falling back to a func if no index is registered.
@@ -99,7 +99,7 @@ type GenericClusterLister interface {
 	// List will return all objects across logical clusters and all namespaces
 	List(selector labels.Selector) (ret []runtime.Object, err error)
 	// ByCluster will give you a cache.GenericLister for one logical cluster
-	ByCluster(cluster logicalcluster.Name) cache.GenericLister
+	ByCluster(clusterName logicalcluster.Name) cache.GenericLister
 }
 
 // ClusterLister is a lister that supports multiple logical clusters. It can list the entire contents of the backing store, and return individual cache.GenericListers that are scoped to individual logical clusters.
@@ -118,29 +118,29 @@ func (s *ClusterLister) List(selector labels.Selector) (ret []runtime.Object, er
 	return ret, err
 }
 
-func (s *ClusterLister) ByCluster(cluster logicalcluster.Name) cache.GenericLister {
+func (s *ClusterLister) ByCluster(clusterName logicalcluster.Name) cache.GenericLister {
 	return &genericLister{
-		indexer:  s.indexer,
-		resource: s.resource,
-		cluster:  cluster,
+		indexer:     s.indexer,
+		resource:    s.resource,
+		clusterName: clusterName,
 	}
 }
 
 type genericLister struct {
-	indexer  cache.Indexer
-	cluster  logicalcluster.Name
-	resource schema.GroupResource
+	indexer     cache.Indexer
+	clusterName logicalcluster.Name
+	resource    schema.GroupResource
 }
 
 func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	err = ListAllByCluster(s.indexer, s.cluster, selector, func(i interface{}) {
+	err = ListAllByCluster(s.indexer, s.clusterName, selector, func(i interface{}) {
 		ret = append(ret, i.(runtime.Object))
 	})
 	return ret, err
 }
 
 func (s *genericLister) Get(name string) (runtime.Object, error) {
-	key := ToClusterAwareKey(s.cluster.String(), "", name)
+	key := ToClusterAwareKey(s.clusterName.String(), "", name)
 	obj, exists, err := s.indexer.GetByKey(key)
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (s *genericLister) ByNamespace(namespace string) cache.GenericNamespaceList
 		indexer:   s.indexer,
 		namespace: namespace,
 		resource:  s.resource,
-		cluster:   s.cluster,
+		cluster:   s.clusterName,
 	}
 }
 

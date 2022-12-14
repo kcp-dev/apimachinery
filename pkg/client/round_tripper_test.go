@@ -19,7 +19,7 @@ package client
 import (
 	"testing"
 
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 func TestRoundTripper_generatePath(t *testing.T) {
@@ -77,7 +77,7 @@ func TestRoundTripper_generatePath(t *testing.T) {
 	}
 	for testName, tt := range tests {
 		t.Run(testName, func(t *testing.T) {
-			result := generatePath(tt.originalPath, logicalcluster.New("root:org:ws"))
+			result := generatePath(tt.originalPath, logicalcluster.NewPath("root:org:ws"))
 			if result != tt.desired {
 				t.Errorf("got %v, want %v", result, tt.desired)
 			}

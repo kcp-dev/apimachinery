@@ -23,17 +23,18 @@ import (
 	"sync"
 	"time"
 
-	kcpcache "github.com/kcp-dev/apimachinery/pkg/cache"
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
 
-	"k8s.io/klog/v2"
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 )
 
 // NewSharedInformer creates a new instance for the listwatcher.
@@ -131,7 +132,7 @@ type sharedIndexInformer struct {
 func (s *sharedIndexInformer) Cluster(cluster logicalcluster.Name) cache.SharedIndexInformer {
 	return &scopedSharedIndexInformer{
 		sharedIndexInformer: s,
-		cluster:             cluster,
+		clusterName:         cluster,
 	}
 }
 

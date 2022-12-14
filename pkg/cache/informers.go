@@ -17,13 +17,14 @@ limitations under the License.
 package cache
 
 import (
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/client-go/tools/cache"
 )
 
 // ScopeableSharedIndexInformer is an informer that knows how to scope itself down to one cluster,
 // or act as an informer across clusters.
 type ScopeableSharedIndexInformer interface {
-	Cluster(cluster logicalcluster.Name) cache.SharedIndexInformer
+	Cluster(clusterName logicalcluster.Name) cache.SharedIndexInformer
 	cache.SharedIndexInformer
 }

@@ -20,7 +20,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/kcp-dev/logicalcluster/v2"
+	"github.com/kcp-dev/logicalcluster/v3"
+
 	"k8s.io/client-go/rest"
 )
 
@@ -31,8 +32,8 @@ type Constructor[R any] struct {
 
 // Cache is a client factory that caches previous results.
 type Cache[R any] interface {
-	ClusterOrDie(name logicalcluster.Name) R
-	Cluster(name logicalcluster.Name) (R, error)
+	ClusterOrDie(clusterPath logicalcluster.Path) R
+	Cluster(clusterPath logicalcluster.Path) (R, error)
 }
 
 // NewCache creates a new client factory cache using the given constructor.
@@ -42,8 +43,8 @@ func NewCache[R any](cfg *rest.Config, client *http.Client, constructor *Constru
 		client:      client,
 		constructor: constructor,
 
-		RWMutex:          &sync.RWMutex{},
-		clientsByCluster: map[logicalcluster.Name]R{},
+		RWMutex:              &sync.RWMutex{},
+		clientsByClusterPath: map[logicalcluster.Path]R{},
 	}
 }
 
@@ -53,13 +54,13 @@ type clientCache[R any] struct {
 	constructor *Constructor[R]
 
 	*sync.RWMutex
-	clientsByCluster map[logicalcluster.Name]R
+	clientsByClusterPath map[logicalcluster.Path]R
 }
 
 // ClusterOrDie returns a new client scoped to the given logical cluster, or panics if there
 // is any error.
-func (c *clientCache[R]) ClusterOrDie(name logicalcluster.Name) R {
-	client, err := c.Cluster(name)
+func (c *clientCache[R]) ClusterOrDie(clusterPath logicalcluster.Path) R {
+	client, err := c.Cluster(clusterPath)
 	if err != nil {
 		// we ensure that the config is valid in the constructor, and we assume that any changes
 		// we make to it during scoping will not make it invalid, in order to hide the error from
@@ -70,17 +71,17 @@ func (c *clientCache[R]) ClusterOrDie(name logicalcluster.Name) R {
 }
 
 // Cluster returns a new client scoped to the given logical cluster.
-func (c *clientCache[R]) Cluster(name logicalcluster.Name) (R, error) {
+func (c *clientCache[R]) Cluster(clusterPath logicalcluster.Path) (R, error) {
 	var cachedClient R
 	var exists bool
 	c.RLock()
-	cachedClient, exists = c.clientsByCluster[name]
+	cachedClient, exists = c.clientsByClusterPath[clusterPath]
 	c.RUnlock()
 	if exists {
 		return cachedClient, nil
 	}
 
-	cfg := SetCluster(rest.CopyConfig(c.cfg), name)
+	cfg := SetCluster(rest.CopyConfig(c.cfg), clusterPath)
 	instance, err := c.constructor.NewForConfigAndClient(cfg, c.client)
 	if err != nil {
 		var result R
@@ -89,12 +90,12 @@ func (c *clientCache[R]) Cluster(name logicalcluster.Name) (R, error) {
 
 	c.Lock()
 	defer c.Unlock()
-	cachedClient, exists = c.clientsByCluster[name]
+	cachedClient, exists = c.clientsByClusterPath[clusterPath]
 	if exists {
 		return cachedClient, nil
 	}
 
-	c.clientsByCluster[name] = instance
+	c.clientsByClusterPath[clusterPath] = instance
 
 	return instance, nil
 }
