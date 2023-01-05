@@ -17,24 +17,10 @@ limitations under the License.
 package client
 
 import (
-	"net/http"
-
 	"github.com/kcp-dev/logicalcluster/v3"
 
 	"k8s.io/client-go/rest"
 )
-
-// SetMultiClusterRoundTripper wraps an existing config's roundtripper
-// with a custom cluster aware roundtripper.
-//
-// Note: it is the caller responsibility to make a copy of the rest config
-func SetMultiClusterRoundTripper(cfg *rest.Config) *rest.Config {
-	cfg.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		return NewClusterRoundTripper(rt)
-	})
-
-	return cfg
-}
 
 // SetCluster modifies the config host path to include the
 // cluster endpoint.

@@ -18,34 +18,11 @@ package client
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 )
-
-// ClusterRoundTripper is a cluster aware wrapper around http.RoundTripper
-type ClusterRoundTripper struct {
-	delegate http.RoundTripper
-}
-
-// NewClusterRoundTripper creates a new cluster aware round tripper
-func NewClusterRoundTripper(delegate http.RoundTripper) *ClusterRoundTripper {
-	return &ClusterRoundTripper{
-		delegate: delegate,
-	}
-}
-
-func (c *ClusterRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	cluster, ok := logicalcluster.ClusterFromContext(req.Context())
-	if ok {
-		req = req.Clone(req.Context())
-		req.URL.Path = generatePath(req.URL.Path, cluster.Path())
-		req.URL.RawPath = generatePath(req.URL.RawPath, cluster.Path())
-	}
-	return c.delegate.RoundTrip(req)
-}
 
 // apiRegex matches any string that has /api/ or /apis/ in it.
 var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
