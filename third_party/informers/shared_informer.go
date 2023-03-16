@@ -295,8 +295,8 @@ func (s *sharedIndexInformer) GetController() cache.Controller {
 	return &dummyController{informer: s}
 }
 
-func (s *sharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) {
-	s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
+func (s *sharedIndexInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	return s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
 }
 
 func determineResyncPeriod(desired, check time.Duration) time.Duration {
@@ -316,13 +316,12 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
-func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) {
+func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (cache.ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
 	if s.stopped {
-		klog.V(2).Infof("Handler %v was not added to shared informer because it has stopped already", handler)
-		return
+		return nil, fmt.Errorf("handler %v was not added to shared informer because it has stopped already", handler)
 	}
 
 	if resyncPeriod > 0 {
@@ -348,8 +347,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
 
 	if !s.started {
-		s.processor.addListener(listener)
-		return
+		return s.processor.addListener(listener), nil
 	}
 
 	// in order to safely join, we have to
@@ -360,10 +358,11 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	s.processor.addListener(listener)
+	handle := s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
 		listener.add(addNotification{newObj: item})
 	}
+	return handle, nil
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
@@ -374,6 +373,26 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 		return processDeltas(s, s.indexer, s.transform, deltas)
 	}
 	return errors.New("object given as Process argument is not Deltas")
+}
+
+// IsStopped reports whether the informer has already been stopped
+func (s *sharedIndexInformer) IsStopped() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.stopped
+}
+
+func (s *sharedIndexInformer) RemoveEventHandler(handle cache.ResourceEventHandlerRegistration) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	// in order to safely remove, we have to
+	// 1. stop sending add/update/delete notifications
+	// 2. remove and stop listener
+	// 3. unblock
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+	return s.processor.removeListener(handle)
 }
 
 // Conforms to cache.ResourceEventHandler
@@ -422,39 +441,85 @@ func (s *sharedIndexInformer) OnDelete(old interface{}) {
 type sharedProcessor struct {
 	listenersStarted bool
 	listenersLock    sync.RWMutex
-	listeners        []*processorListener
-	syncingListeners []*processorListener
-	clock            clock.Clock
-	wg               wait.Group
+	// Map from listeners to whether or not they are currently syncing
+	listeners map[*processorListener]bool
+	clock     clock.Clock
+	wg        wait.Group
 }
 
-func (p *sharedProcessor) addListener(listener *processorListener) {
+func (p *sharedProcessor) getListener(registration cache.ResourceEventHandlerRegistration) *processorListener {
+	p.listenersLock.RLock()
+	defer p.listenersLock.RUnlock()
+
+	if p.listeners == nil {
+		return nil
+	}
+
+	if result, ok := registration.(*processorListener); ok {
+		if _, exists := p.listeners[result]; exists {
+			return result
+		}
+	}
+
+	return nil
+}
+
+func (p *sharedProcessor) addListener(listener *processorListener) cache.ResourceEventHandlerRegistration {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
-	p.addListenerLocked(listener)
+	if p.listeners == nil {
+		p.listeners = make(map[*processorListener]bool)
+	}
+
+	p.listeners[listener] = true
+
 	if p.listenersStarted {
 		p.wg.Start(listener.run)
 		p.wg.Start(listener.pop)
 	}
+
+	return listener
 }
 
-func (p *sharedProcessor) addListenerLocked(listener *processorListener) {
-	p.listeners = append(p.listeners, listener)
-	p.syncingListeners = append(p.syncingListeners, listener)
+func (p *sharedProcessor) removeListener(handle cache.ResourceEventHandlerRegistration) error {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+
+	listener, ok := handle.(*processorListener)
+	if !ok {
+		return fmt.Errorf("invalid key type %t", handle)
+	} else if p.listeners == nil {
+		// No listeners are registered, do nothing
+		return nil
+	} else if _, exists := p.listeners[listener]; !exists {
+		// Listener is not registered, just do nothing
+		return nil
+	}
+
+	delete(p.listeners, listener)
+
+	if p.listenersStarted {
+		close(listener.addCh)
+	}
+
+	return nil
 }
 
 func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
-	if sync {
-		for _, listener := range p.syncingListeners {
+	for listener, isSyncing := range p.listeners {
+		switch {
+		case !sync:
+			// non-sync messages are delivered to every listener
 			listener.add(obj)
-		}
-	} else {
-		for _, listener := range p.listeners {
+		case isSyncing:
+			// sync messages are delivered to every syncing listener
 			listener.add(obj)
+		default:
+			// skipping a sync obj for a non-syncing listener
 		}
 	}
 }
@@ -463,18 +528,27 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 	func() {
 		p.listenersLock.RLock()
 		defer p.listenersLock.RUnlock()
-		for _, listener := range p.listeners {
+		for listener := range p.listeners {
 			p.wg.Start(listener.run)
 			p.wg.Start(listener.pop)
 		}
 		p.listenersStarted = true
 	}()
 	<-stopCh
-	p.listenersLock.RLock()
-	defer p.listenersLock.RUnlock()
-	for _, listener := range p.listeners {
+
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+	for listener := range p.listeners {
 		close(listener.addCh) // Tell .pop() to stop. .pop() will tell .run() to stop
 	}
+
+	// Wipe out list of listeners since they are now closed
+	// (processorListener cannot be re-used)
+	p.listeners = nil
+
+	// Reset to false since no listeners are running
+	p.listenersStarted = false
+
 	p.wg.Wait() // Wait for all .pop() and .run() to stop
 }
 
@@ -484,16 +558,16 @@ func (p *sharedProcessor) shouldResync() bool {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
-	p.syncingListeners = []*processorListener{}
-
 	resyncNeeded := false
 	now := p.clock.Now()
-	for _, listener := range p.listeners {
+	for listener := range p.listeners {
 		// need to loop through all the listeners to see if they need to resync so we can prepare any
 		// listeners that are going to be resyncing.
-		if listener.shouldResync(now) {
+		shouldResync := listener.shouldResync(now)
+		p.listeners[listener] = shouldResync
+
+		if shouldResync {
 			resyncNeeded = true
-			p.syncingListeners = append(p.syncingListeners, listener)
 			listener.determineNextResync(now)
 		}
 	}
@@ -504,7 +578,7 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
-	for _, listener := range p.listeners {
+	for listener := range p.listeners {
 		resyncPeriod := determineResyncPeriod(listener.requestedResyncPeriod, resyncCheckPeriod)
 		listener.setResyncPeriod(resyncPeriod)
 	}
