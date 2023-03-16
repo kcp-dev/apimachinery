@@ -27,7 +27,7 @@ import (
 // apiRegex matches any string that has /api/ or /apis/ in it.
 var apiRegex = regexp.MustCompile(`(/api/|/apis/)`)
 
-// generatePath formats the request path to target the specified cluster
+// generatePath formats the request path to target the specified cluster.
 func generatePath(originalPath string, clusterPath logicalcluster.Path) string {
 	// If the originalPath already has cluster.Path() then the path was already modifed and no change needed
 	if strings.Contains(originalPath, clusterPath.RequestPath()) {
