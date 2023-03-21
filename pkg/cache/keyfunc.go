@@ -26,6 +26,49 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// Key identifies an object of some implict kind, possibly where
+// cluster or namespace are not issues.
+// Put another way, Key identifies an instance of some implicit resource.
+// Put another way, Key is what SplitMetaClusterNamespaceKey wants to return,
+// but passing one of these instead of a string means that the receiver never
+// has to worry about syntax errors.
+type Key struct {
+	Cluster   logicalcluster.Name
+	Namespace string
+	Name      string
+}
+
+// NewKey constructs a Key
+func NewKey(cluster logicalcluster.Name, namespace, name string) Key {
+	return Key{Cluster: cluster, Namespace: namespace, Name: name}
+}
+
+func (key Key) Parts() (cluster logicalcluster.Name, namespace, name string) {
+	return key.Cluster, key.Namespace, key.Name
+}
+
+// String returns the standard string representation of the given Key
+func (key Key) String() string {
+	var ans string
+	if key.Cluster != "" {
+		ans += key.Cluster.String() + "|"
+	}
+	if key.Namespace != "" {
+		ans += key.Namespace + "/"
+	}
+	ans += key.Name
+	return ans
+
+}
+
+// ParseKey inverts the usual encoding, complaining on syntax error
+func ParseKey(encoded string) (Key, error) {
+	var key Key
+	var err error
+	key.Cluster, key.Namespace, key.Name, err = SplitMetaClusterNamespaceKey(encoded)
+	return key, err
+}
+
 // DeletionHandlingMetaClusterNamespaceKeyFunc checks for
 // DeletedFinalStateUnknown objects before calling
 // MetaClusterNamespaceKeyFunc.
@@ -36,36 +79,37 @@ func DeletionHandlingMetaClusterNamespaceKeyFunc(obj interface{}) (string, error
 	return MetaClusterNamespaceKeyFunc(obj)
 }
 
+// ObjMetaClusterNamespaceKey is a convenient default KeyFunc which knows how to make
+// structured keys for API objects which implement meta.Interface.
+// This is the structured alternative to MetaClusterNamespaceKeyFunc;
+// putting such an object reference in a queue means that no parsing errors are possible downstream.
+func ObjMetaClusterNamespaceKey(obj interface{}) (Key, error) {
+	if key, ok := obj.(cache.ExplicitKey); ok {
+		return ParseKey(string(key))
+	}
+	meta, err := meta.Accessor(obj)
+	if err != nil {
+		return Key{}, fmt.Errorf("object has no meta: %v", err)
+	}
+	return Key{Cluster: logicalcluster.From(meta), Namespace: meta.GetNamespace(), Name: meta.GetName()}, nil
+}
+
 // MetaClusterNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
 // keys for API objects which implement meta.Interface.
 // The key uses the format <clusterName>|<namespace>/<name> unless <namespace> is empty, then
 // it's just <clusterName>|<name>, and if running in a single-cluster context where no explicit
 // cluster name is given, it's just <name>.
 func MetaClusterNamespaceKeyFunc(obj interface{}) (string, error) {
-	if key, ok := obj.(cache.ExplicitKey); ok {
-		return string(key), nil
-	}
-	meta, err := meta.Accessor(obj)
-	if err != nil {
-		return "", fmt.Errorf("object has no meta: %v", err)
-	}
-	return ToClusterAwareKey(logicalcluster.From(meta).String(), meta.GetNamespace(), meta.GetName()), nil
+	key, err := ObjMetaClusterNamespaceKey(obj)
+	return key.String(), err
 }
 
 // ToClusterAwareKey formats a cluster, namespace, and name as a key.
 func ToClusterAwareKey(cluster, namespace, name string) string {
-	var key string
-	if cluster != "" {
-		key += cluster + "|"
-	}
-	if namespace != "" {
-		key += namespace + "/"
-	}
-	key += name
-	return key
+	return Key{Cluster: logicalcluster.Name(cluster), Namespace: namespace, Name: name}.String()
 }
 
-// SplitMetaClusterNamespaceKey returns the namespace and name that
+// SplitMetaClusterNamespaceKey returns the cluster, namespace, and name that
 // MetaClusterNamespaceKeyFunc encoded into key.
 func SplitMetaClusterNamespaceKey(key string) (clusterName logicalcluster.Name, namespace, name string, err error) {
 	invalidKey := fmt.Errorf("unexpected key format: %q", key)
