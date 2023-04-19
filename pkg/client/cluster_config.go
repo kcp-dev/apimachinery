@@ -25,8 +25,8 @@ import (
 // SetCluster modifies the config host path to include the
 // cluster endpoint.
 //
-// Note: it is the caller responsibility to make a copy of the rest config
+// Note: it is the caller responsibility to make a copy of the rest config.
 func SetCluster(cfg *rest.Config, clusterPath logicalcluster.Path) *rest.Config {
-	cfg.Host = cfg.Host + clusterPath.RequestPath()
+	cfg.Host += clusterPath.RequestPath()
 	return cfg
 }
