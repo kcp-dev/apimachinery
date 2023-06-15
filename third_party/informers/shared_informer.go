@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache/synctrack"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
@@ -37,14 +38,26 @@ import (
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
 )
 
-// NewSharedInformer creates a new instance for the listwatcher.
+// NewSharedInformer creates a new instance for the ListerWatcher. See NewSharedIndexInformerWithOptions for full details.
 func NewSharedInformer(lw cache.ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) cache.SharedInformer {
 	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, cache.Indexers{})
 }
 
-// NewSharedIndexInformer creates a new instance for the listwatcher.
-// The created informer will not do resyncs if the given
-// defaultEventHandlerResyncPeriod is zero.  Otherwise: for each
+// NewSharedIndexInformer creates a new instance for the ListerWatcher and specified Indexers. See
+// NewSharedIndexInformerWithOptions for full details.
+func NewSharedIndexInformer(lw cache.ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers cache.Indexers) kcpcache.ScopeableSharedIndexInformer {
+	return NewSharedIndexInformerWithOptions(
+		lw,
+		exampleObject,
+		cache.SharedIndexInformerOptions{
+			ResyncPeriod: defaultEventHandlerResyncPeriod,
+			Indexers:     indexers,
+		},
+	)
+}
+
+// NewSharedIndexInformerWithOptions creates a new instance for the ListerWatcher.
+// The created informer will not do resyncs if options.ResyncPeriod is zero.  Otherwise: for each
 // handler that with a non-zero requested resync period, whether added
 // before or after the informer starts, the nominal resync period is
 // the requested resync period rounded up to a multiple of the
@@ -52,22 +65,23 @@ func NewSharedInformer(lw cache.ListerWatcher, exampleObject runtime.Object, def
 // checking period is established when the informer starts running,
 // and is the maximum of (a) the minimum of the resync periods
 // requested before the informer starts and the
-// defaultEventHandlerResyncPeriod given here and (b) the constant
+// options.ResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
-func NewSharedIndexInformer(lw cache.ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers cache.Indexers) kcpcache.ScopeableSharedIndexInformer {
+func NewSharedIndexInformerWithOptions(lw cache.ListerWatcher, exampleObject runtime.Object, options cache.SharedIndexInformerOptions) kcpcache.ScopeableSharedIndexInformer {
 	realClock := &clock.RealClock{}
-	sharedIndexInformer := &sharedIndexInformer{
-		processor: &sharedProcessor{clock: realClock},
+
+	return &sharedIndexInformer{
 		// KCP modification: We changed the keyfunction passed to NewIndexer
-		indexer:                         cache.NewIndexer(kcpcache.MetaClusterNamespaceKeyFunc, indexers),
+		indexer:                         cache.NewIndexer(kcpcache.MetaClusterNamespaceKeyFunc, options.Indexers),
+		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
-		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
-		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           cache.NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
+		objectDescription:               options.ObjectDescription,
+		resyncCheckPeriod:               options.ResyncPeriod,
+		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
+		cacheMutationDetector:           cache.NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 	}
-	return sharedIndexInformer
 }
 
 const (
@@ -100,11 +114,12 @@ type sharedIndexInformer struct {
 
 	listerWatcher cache.ListerWatcher
 
-	// objectType is an example object of the type this informer is
-	// expected to handle.  Only the type needs to be right, except
-	// that when that is `unstructured.Unstructured` the object's
-	// `"apiVersion"` and `"kind"` must also be right.
+	// objectType is an example object of the type this informer is expected to handle. If set, an event
+	// with an object with a mismatching type is dropped instead of being delivered to listeners.
 	objectType runtime.Object
+
+	// objectDescription is the description of this informer's objects. This typically defaults to
+	objectDescription string
 
 	// resyncCheckPeriod is how often we want the reflector's resync timer to fire so it can call
 	// shouldResync to check if any of our listeners need a resync.
@@ -162,7 +177,8 @@ type updateNotification struct {
 }
 
 type addNotification struct {
-	newObj interface{}
+	newObj          interface{}
+	isInInitialList bool
 }
 
 type deleteNotification struct {
@@ -203,17 +219,19 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	fifo := cache.NewDeltaFIFOWithOptions(cache.DeltaFIFOOptions{
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
+		Transformer:           s.transform,
 		// KCP modification: We changed the keyfunction passed to NewDeltaFIFOWithOptions
 		KeyFunction: kcpcache.MetaClusterNamespaceKeyFunc,
 	})
 
 	cfg := &cache.Config{
-		Queue:            fifo,
-		ListerWatcher:    s.listerWatcher,
-		ObjectType:       s.objectType,
-		FullResyncPeriod: s.resyncCheckPeriod,
-		RetryOnError:     false,
-		ShouldResync:     s.processor.shouldResync,
+		Queue:             fifo,
+		ListerWatcher:     s.listerWatcher,
+		ObjectType:        s.objectType,
+		ObjectDescription: s.objectDescription,
+		FullResyncPeriod:  s.resyncCheckPeriod,
+		RetryOnError:      false,
+		ShouldResync:      s.processor.shouldResync,
 
 		Process:           s.HandleDeltas,
 		WatchErrorHandler: s.watchErrorHandler,
@@ -344,7 +362,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
+	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
 
 	if !s.started {
 		return s.processor.addListener(listener), nil
@@ -360,17 +378,25 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 
 	handle := s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
-		listener.add(addNotification{newObj: item})
+		// Note that we enqueue these notifications with the lock held
+		// and before returning the handle. That means there is never a
+		// chance for anyone to call the handle's HasSynced method in a
+		// state when it would falsely return true (i.e., when the
+		// shared informer is synced but it has not observed an Add
+		// with isInitialList being true, nor when the thread
+		// processing notifications somehow goes faster than this
+		// thread adding them and the counter is temporarily zero).
+		listener.add(addNotification{newObj: item, isInInitialList: true})
 	}
 	return handle, nil
 }
 
-func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
+func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool) error {
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
 	if deltas, ok := obj.(cache.Deltas); ok {
-		return processDeltas(s, s.indexer, s.transform, deltas)
+		return processDeltas(s, s.indexer, deltas, isInInitialList)
 	}
 	return errors.New("object given as Process argument is not Deltas")
 }
@@ -396,11 +422,11 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle cache.ResourceEventHandl
 }
 
 // Conforms to cache.ResourceEventHandler
-func (s *sharedIndexInformer) OnAdd(obj interface{}) {
+func (s *sharedIndexInformer) OnAdd(obj interface{}, isInInitialList bool) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
 	s.cacheMutationDetector.AddObject(obj)
-	s.processor.distribute(addNotification{newObj: obj}, false)
+	s.processor.distribute(addNotification{newObj: obj, isInInitialList: isInInitialList}, false)
 }
 
 // Conforms to cache.ResourceEventHandler
@@ -601,6 +627,8 @@ type processorListener struct {
 
 	handler cache.ResourceEventHandler
 
+	syncTracker *synctrack.SingleFileTracker
+
 	// pendingNotifications is an unbounded ring buffer that holds all notifications not yet distributed.
 	// There is one per listener, but a failing/stalled listener will have infinite pendingNotifications
 	// added until we OOM.
@@ -631,11 +659,18 @@ type processorListener struct {
 	resyncLock sync.Mutex
 }
 
-func newProcessListener(handler cache.ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
+// HasSynced returns true if the source informer has synced, and all
+// corresponding events have been delivered.
+func (p *processorListener) HasSynced() bool {
+	return p.syncTracker.HasSynced()
+}
+
+func newProcessListener(handler cache.ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
 	ret := &processorListener{
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
+		syncTracker:           &synctrack.SingleFileTracker{UpstreamHasSynced: hasSynced},
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
@@ -647,6 +682,9 @@ func newProcessListener(handler cache.ResourceEventHandler, requestedResyncPerio
 }
 
 func (p *processorListener) add(notification interface{}) {
+	if a, ok := notification.(addNotification); ok && a.isInInitialList {
+		p.syncTracker.Start()
+	}
 	p.addCh <- notification
 }
 
@@ -692,7 +730,10 @@ func (p *processorListener) run() {
 			case updateNotification:
 				p.handler.OnUpdate(notification.oldObj, notification.newObj)
 			case addNotification:
-				p.handler.OnAdd(notification.newObj)
+				p.handler.OnAdd(notification.newObj, notification.isInInitialList)
+				if notification.isInInitialList {
+					p.syncTracker.Finished()
+				}
 			case deleteNotification:
 				p.handler.OnDelete(notification.oldObj)
 			default:
@@ -739,19 +780,12 @@ func processDeltas(
 	// Object which receives event notifications from the given deltas
 	handler cache.ResourceEventHandler,
 	clientState cache.Store,
-	transformer cache.TransformFunc,
 	deltas cache.Deltas,
+	isInInitialList bool,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
 		obj := d.Object
-		if transformer != nil {
-			var err error
-			obj, err = transformer(obj)
-			if err != nil {
-				return err
-			}
-		}
 
 		switch d.Type {
 		case cache.Sync, cache.Replaced, cache.Added, cache.Updated:
@@ -764,7 +798,7 @@ func processDeltas(
 				if err := clientState.Add(obj); err != nil {
 					return err
 				}
-				handler.OnAdd(obj)
+				handler.OnAdd(obj, isInInitialList)
 			}
 		case cache.Deleted:
 			if err := clientState.Delete(obj); err != nil {

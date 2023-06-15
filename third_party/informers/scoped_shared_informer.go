@@ -55,27 +55,20 @@ func (s *scopedSharedIndexInformer) AddEventHandler(handler cache.ResourceEventH
 // because the implementation takes time to do work and there may
 // be competing load and scheduling noise.
 func (s *scopedSharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (cache.ResourceEventHandlerRegistration, error) {
-	scopedHandler := cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			if s.objectMatches(obj) {
-				handler.OnAdd(obj)
-			}
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			if s.objectMatches(newObj) {
-				handler.OnUpdate(oldObj, newObj)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			if s.objectMatches(obj) {
-				handler.OnDelete(obj)
-			}
-		},
+	scopedHandler := &filteringResourceEventHandler{
+		handler:     handler,
+		clusterName: s.clusterName,
 	}
+
 	return s.sharedIndexInformer.AddEventHandlerWithResyncPeriod(scopedHandler, resyncPeriod)
 }
 
-func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
+type filteringResourceEventHandler struct {
+	handler     cache.ResourceEventHandler
+	clusterName logicalcluster.Name
+}
+
+func (h *filteringResourceEventHandler) objectMatches(obj interface{}) bool {
 	key, err := kcpcache.MetaClusterNamespaceKeyFunc(obj)
 	if err != nil {
 		return false
@@ -84,5 +77,23 @@ func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
 	if err != nil {
 		return false
 	}
-	return cluster == s.clusterName
+	return cluster == h.clusterName
+}
+
+func (h *filteringResourceEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
+	if h.objectMatches(obj) {
+		h.handler.OnAdd(obj, isInInitialList)
+	}
+}
+
+func (h *filteringResourceEventHandler) OnUpdate(oldObj, newObj interface{}) {
+	if h.objectMatches(newObj) {
+		h.handler.OnUpdate(oldObj, newObj)
+	}
+}
+
+func (h *filteringResourceEventHandler) OnDelete(obj interface{}) {
+	if h.objectMatches(obj) {
+		h.handler.OnDelete(obj)
+	}
 }
