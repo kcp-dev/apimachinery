@@ -30,6 +30,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache/synctrack"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
@@ -162,7 +163,8 @@ type updateNotification struct {
 }
 
 type addNotification struct {
-	newObj interface{}
+	newObj          interface{}
+	isInInitialList bool
 }
 
 type deleteNotification struct {
@@ -362,24 +364,18 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 	for _, item := range s.indexer.List() {
 		listener.add(addNotification{newObj: item})
 	}
+
 	return handle, nil
 }
 
-func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
+func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool) error {
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
 	if deltas, ok := obj.(cache.Deltas); ok {
-		return processDeltas(s, s.indexer, s.transform, deltas)
+		return processDeltas(s, s.indexer, s.transform, deltas, isInInitialList)
 	}
 	return errors.New("object given as Process argument is not Deltas")
-}
-
-// IsStopped reports whether the informer has already been stopped
-func (s *sharedIndexInformer) IsStopped() bool {
-	s.startedLock.Lock()
-	defer s.startedLock.Unlock()
-	return s.stopped
 }
 
 func (s *sharedIndexInformer) RemoveEventHandler(handle cache.ResourceEventHandlerRegistration) error {
@@ -396,11 +392,11 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle cache.ResourceEventHandl
 }
 
 // Conforms to cache.ResourceEventHandler
-func (s *sharedIndexInformer) OnAdd(obj interface{}) {
+func (s *sharedIndexInformer) OnAdd(obj interface{}, isInInitialList bool) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
 	s.cacheMutationDetector.AddObject(obj)
-	s.processor.distribute(addNotification{newObj: obj}, false)
+	s.processor.distribute(addNotification{newObj: obj, isInInitialList: isInInitialList}, false)
 }
 
 // Conforms to cache.ResourceEventHandler
@@ -430,6 +426,13 @@ func (s *sharedIndexInformer) OnDelete(old interface{}) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
 	// save to distribute the notification
 	s.processor.distribute(deleteNotification{oldObj: old}, false)
+}
+
+// IsStopped reports whether the informer has already been stopped
+func (s *sharedIndexInformer) IsStopped() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.stopped
 }
 
 // sharedProcessor has a collection of processorListener and can
@@ -601,6 +604,8 @@ type processorListener struct {
 
 	handler cache.ResourceEventHandler
 
+	syncTracker *synctrack.SingleFileTracker
+
 	// pendingNotifications is an unbounded ring buffer that holds all notifications not yet distributed.
 	// There is one per listener, but a failing/stalled listener will have infinite pendingNotifications
 	// added until we OOM.
@@ -629,6 +634,12 @@ type processorListener struct {
 	nextResync time.Time
 	// resyncLock guards access to resyncPeriod and nextResync
 	resyncLock sync.Mutex
+}
+
+// HasSynced returns true if the source informer has synced, and all
+// corresponding events have been delivered.
+func (p *processorListener) HasSynced() bool {
+	return p.syncTracker.HasSynced()
 }
 
 func newProcessListener(handler cache.ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
@@ -692,7 +703,7 @@ func (p *processorListener) run() {
 			case updateNotification:
 				p.handler.OnUpdate(notification.oldObj, notification.newObj)
 			case addNotification:
-				p.handler.OnAdd(notification.newObj)
+				p.handler.OnAdd(notification.newObj, notification.isInInitialList)
 			case deleteNotification:
 				p.handler.OnDelete(notification.oldObj)
 			default:
@@ -741,6 +752,7 @@ func processDeltas(
 	clientState cache.Store,
 	transformer cache.TransformFunc,
 	deltas cache.Deltas,
+	isInInitialList bool,
 ) error {
 	// from oldest to newest
 	for _, d := range deltas {
@@ -764,7 +776,7 @@ func processDeltas(
 				if err := clientState.Add(obj); err != nil {
 					return err
 				}
-				handler.OnAdd(obj)
+				handler.OnAdd(obj, isInInitialList)
 			}
 		case cache.Deleted:
 			if err := clientState.Delete(obj); err != nil {

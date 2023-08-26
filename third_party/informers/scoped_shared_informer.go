@@ -58,7 +58,7 @@ func (s *scopedSharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cach
 	scopedHandler := cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			if s.objectMatches(obj) {
-				handler.OnAdd(obj)
+				handler.OnAdd(obj, true)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -73,6 +73,26 @@ func (s *scopedSharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cach
 		},
 	}
 	return s.sharedIndexInformer.AddEventHandlerWithResyncPeriod(scopedHandler, resyncPeriod)
+}
+
+// IsStopped reports whether the informer has already been stopped
+func (s *scopedSharedIndexInformer) IsStopped() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.stopped
+}
+
+func (s *scopedSharedIndexInformer) RemoveEventHandler(handle cache.ResourceEventHandlerRegistration) error {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	// in order to safely remove, we have to
+	// 1. stop sending add/update/delete notifications
+	// 2. remove and stop listener
+	// 3. unblock
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+	return s.processor.removeListener(handle)
 }
 
 func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
