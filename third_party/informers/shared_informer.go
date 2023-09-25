@@ -346,7 +346,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cache.Reso
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
+	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, func() bool { return true })
 
 	if !s.started {
 		return s.processor.addListener(listener), nil
@@ -642,11 +642,12 @@ func (p *processorListener) HasSynced() bool {
 	return p.syncTracker.HasSynced()
 }
 
-func newProcessListener(handler cache.ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
+func newProcessListener(handler cache.ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
 	ret := &processorListener{
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
+		syncTracker:           &synctrack.SingleFileTracker{UpstreamHasSynced: hasSynced},
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
