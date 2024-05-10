@@ -10,7 +10,6 @@ linters:
   - bidichk
   - bodyclose
   - containedctx
-  - depguard
   - dupword
   - durationcheck
   - errcheck
@@ -37,9 +36,10 @@ linters:
   - unused
   - usestdlibvars
   - whitespace
-  # TODO(vincepri): Figure out if we want to enable or remove the following linters:
+  # TODO: Figure out if we want to enable or remove the following linters:
   # - predeclared
   # - goconst
+  # - depguard
 
 linters-settings:
   misspell:
@@ -70,7 +70,7 @@ linters-settings:
       - name: unreachable-code
       - name: bool-literal-in-expr
       - name: constant-logical-expr
-      # TODO(vincepri): Figure out if we want to enable
+      # TODO: Figure out if we want to enable
       # the following rules, or remove them completely, they're a bit noisy.
       # - name: context-as-argument
       # - name: var-naming
@@ -84,7 +84,7 @@ linters-settings:
     excludes:
     - G307 # Deferring unsafe method "Close" on type "\*os.File"
     - G108 # Profiling endpoint is automatically exposed on /debug/pprof
-    # TODO(vincepri): The following should be looked at and removed in future iterations.
+    # TODO: The following should be looked at and removed in future iterations.
     - G401 # Use of weak cryptographic primitive (replace sha1 usage)
     - G505 # crypto/sha1: weak cryptographic primitive
     - G402 # TLS MinVersion too low (set MinVersion in TLSClientConfig)
@@ -114,7 +114,7 @@ linters-settings:
     - rangeValCopy
     - hugeParam
     - commentedOutCode
-    # TODO(vincepri): potentially enable the following?
+    # TODO: potentially enable the following?
     - emptyStringTest
     - singleCaseSwitch
     - nestingReduce
