@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Originally copied from
-# https://github.com/kubernetes-sigs/cluster-api-provider-gcp/blob/c26a68b23e9317323d5d37660fe9d29b3d2ff40c/scripts/go_install.sh
+# https://github.com/kubernetes-sigs/controller-runtime/blob/479b723944e34ae42c9911fe01228ff34eb5ca81/hack/go-install.sh#L4
 
 set -o errexit
 set -o nounset
@@ -41,22 +41,9 @@ if [ -z "${GOBIN}" ]; then
   exit 1
 fi
 
-mkdir -p "${GOBIN}"
-
-tmp_dir=$(mktemp -d -t goinstall_XXXXXXXXXX)
-function clean {
-  rm -rf "${tmp_dir}"
-}
-trap clean EXIT
-
-rm "${GOBIN}/${2}"* > /dev/null 2>&1 || true
-
-cd "${tmp_dir}"
-
-# create a new module in the tmp directory
-go mod init fake/mod
+rm -f "${GOBIN}/${2}"* || true
 
 # install the golang module specified as the first argument
-go install -tags tools "${1}@${3}"
+go install "${1}@${3}"
 mv "${GOBIN}/${2}" "${GOBIN}/${2}-${3}"
 ln -sf "${GOBIN}/${2}-${3}" "${GOBIN}/${2}"
