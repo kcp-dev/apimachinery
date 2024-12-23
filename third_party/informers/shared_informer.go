@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/cache/synctrack"
 	"k8s.io/klog/v2"
@@ -154,6 +155,10 @@ func (v *dummyController) HasSynced() bool {
 }
 
 func (v *dummyController) LastSyncResourceVersion() string {
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InformerResourceVersion) {
+		return v.informer.controller.LastSyncResourceVersion()
+	}
+
 	return ""
 }
 
