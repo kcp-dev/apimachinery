@@ -2,8 +2,6 @@ module github.com/kcp-dev/apimachinery/v2
 
 go 1.23.0
 
-toolchain go1.23.3
-
 require (
 	github.com/google/go-cmp v0.6.0
 	github.com/kcp-dev/logicalcluster/v3 v3.0.4
