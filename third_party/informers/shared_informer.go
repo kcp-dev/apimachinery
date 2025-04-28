@@ -18,6 +18,7 @@ limitations under the License.
 package informers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -132,10 +133,11 @@ type sharedIndexInformer struct {
 }
 
 func (s *sharedIndexInformer) Cluster(cluster logicalcluster.Name) cache.SharedIndexInformer {
-	return &scopedSharedIndexInformer{
-		sharedIndexInformer: s,
-		clusterName:         cluster,
-	}
+	return newScopedSharedIndexInformer(s, cluster)
+}
+
+func (s *sharedIndexInformer) ClusterWithContext(ctx context.Context, cluster logicalcluster.Name) cache.SharedIndexInformer {
+	return newScopedSharedIndexInformerWithContext(ctx, s, cluster)
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one

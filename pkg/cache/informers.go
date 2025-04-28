@@ -17,6 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"context"
+
 	"github.com/kcp-dev/logicalcluster/v3"
 
 	"k8s.io/client-go/tools/cache"
@@ -26,5 +28,6 @@ import (
 // or act as an informer across clusters.
 type ScopeableSharedIndexInformer interface {
 	Cluster(clusterName logicalcluster.Name) cache.SharedIndexInformer
+	ClusterWithContext(ctx context.Context, clusterName logicalcluster.Name) cache.SharedIndexInformer
 	cache.SharedIndexInformer
 }
