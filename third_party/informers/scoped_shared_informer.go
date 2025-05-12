@@ -17,10 +17,13 @@ limitations under the License.
 package informers
 
 import (
+	"context"
+	"sync"
 	"time"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
 
 	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
@@ -31,6 +34,26 @@ import (
 type scopedSharedIndexInformer struct {
 	*sharedIndexInformer
 	clusterName logicalcluster.Name
+
+	handlerRegistrationsLock sync.Mutex
+	handlerRegistrations     map[cache.ResourceEventHandlerRegistration]bool
+}
+
+func newScopedSharedIndexInformer(sharedIndexInformer *sharedIndexInformer, cluster logicalcluster.Name) *scopedSharedIndexInformer {
+	return &scopedSharedIndexInformer{
+		sharedIndexInformer:  sharedIndexInformer,
+		clusterName:          cluster,
+		handlerRegistrations: make(map[cache.ResourceEventHandlerRegistration]bool),
+	}
+}
+
+func newScopedSharedIndexInformerWithContext(ctx context.Context, sharedIndexInformer *sharedIndexInformer, cluster logicalcluster.Name) *scopedSharedIndexInformer {
+	informer := newScopedSharedIndexInformer(sharedIndexInformer, cluster)
+	go func() {
+		<-ctx.Done()
+		informer.unregisterAllHandlers()
+	}()
+	return informer
 }
 
 // AddEventHandler adds an event handler to the shared informer using the shared informer's resync
@@ -72,7 +95,17 @@ func (s *scopedSharedIndexInformer) AddEventHandlerWithResyncPeriod(handler cach
 			}
 		},
 	}
-	return s.sharedIndexInformer.AddEventHandlerWithResyncPeriod(scopedHandler, resyncPeriod)
+
+	registration, err := s.sharedIndexInformer.AddEventHandlerWithResyncPeriod(scopedHandler, resyncPeriod)
+	if err != nil {
+		return nil, err
+	}
+
+	s.handlerRegistrationsLock.Lock()
+	defer s.handlerRegistrationsLock.Unlock()
+	s.handlerRegistrations[registration] = true
+
+	return registration, nil
 }
 
 // IsStopped reports whether the informer has already been stopped
@@ -92,7 +125,28 @@ func (s *scopedSharedIndexInformer) RemoveEventHandler(handle cache.ResourceEven
 	// 3. unblock
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
-	return s.processor.removeListener(handle)
+	if err := s.processor.removeListener(handle); err != nil {
+		return err
+	}
+	s.handlerRegistrationsLock.Lock()
+	defer s.handlerRegistrationsLock.Unlock()
+	delete(s.handlerRegistrations, handle)
+	return nil
+}
+
+func (s *scopedSharedIndexInformer) unregisterAllHandlers() {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+	s.handlerRegistrationsLock.Lock()
+	defer s.handlerRegistrationsLock.Unlock()
+
+	handlerRegistrations := s.handlerRegistrations
+	for handle := range handlerRegistrations {
+		utilruntime.HandleError(s.processor.removeListener(handle))
+		delete(s.handlerRegistrations, handle)
+	}
 }
 
 func (s *scopedSharedIndexInformer) objectMatches(obj interface{}) bool {
